@@ -14,6 +14,7 @@ final class WindowPlacementTests: XCTestCase {
     XCTAssertEqual(placement.tailSide, .left)
     XCTAssertEqual(placement.origin.x, 188)
     XCTAssertEqual(placement.origin.y, 40)
+    XCTAssertEqual(placement.tailCenterY, 100)
   }
 
   func testBubbleFlipsLeftNearRightEdge() {
@@ -25,6 +26,28 @@ final class WindowPlacementTests: XCTestCase {
 
     XCTAssertEqual(placement.tailSide, .right)
     XCTAssertEqual(placement.origin.x, 592)
+  }
+
+  func testBubbleTailTracksCharacterNearBottomEdge() {
+    let placement = WindowPlacement.bubblePlacement(
+      characterFrame: CGRect(x: 100, y: 0, width: 80, height: 80),
+      bubbleSize: CGSize(width: 300, height: 200),
+      visibleFrame: CGRect(x: 0, y: 0, width: 1_000, height: 800)
+    )
+
+    XCTAssertEqual(placement.origin.y, 0)
+    XCTAssertEqual(placement.tailCenterY, 40)
+  }
+
+  func testBubbleTailTracksCharacterNearTopEdge() {
+    let placement = WindowPlacement.bubblePlacement(
+      characterFrame: CGRect(x: 100, y: 720, width: 80, height: 80),
+      bubbleSize: CGSize(width: 300, height: 200),
+      visibleFrame: CGRect(x: 0, y: 0, width: 1_000, height: 800)
+    )
+
+    XCTAssertEqual(placement.origin.y, 600)
+    XCTAssertEqual(placement.tailCenterY, 160)
   }
 
   func testClampedOriginKeepsWindowInsideVisibleFrame() {

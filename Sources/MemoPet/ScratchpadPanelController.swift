@@ -71,6 +71,7 @@ final class ScratchpadPanelController: NSWindowController, NSTextViewDelegate {
       visibleFrame: visibleFrame
     )
     bubbleView.tailSide = placement.tailSide
+    bubbleView.tailCenterY = placement.tailCenterY
     panel.setFrameOrigin(placement.origin)
 
     let currentApplication = NSWorkspace.shared.frontmostApplication
@@ -105,6 +106,7 @@ final class ScratchpadPanelController: NSWindowController, NSTextViewDelegate {
       visibleFrame: visibleFrame
     )
     bubbleView.tailSide = placement.tailSide
+    bubbleView.tailCenterY = placement.tailCenterY
     window?.setFrameOrigin(placement.origin)
   }
 

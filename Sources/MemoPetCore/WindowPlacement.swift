@@ -8,10 +8,16 @@ public enum BubbleTailSide: Equatable, Sendable {
 public struct BubblePlacement: Equatable, Sendable {
   public let origin: CGPoint
   public let tailSide: BubbleTailSide
+  public let tailCenterY: CGFloat
 
-  public init(origin: CGPoint, tailSide: BubbleTailSide) {
+  public init(
+    origin: CGPoint,
+    tailSide: BubbleTailSide,
+    tailCenterY: CGFloat
+  ) {
     self.origin = origin
     self.tailSide = tailSide
+    self.tailCenterY = tailCenterY
   }
 }
 
@@ -50,7 +56,8 @@ public enum WindowPlacement {
 
     return BubblePlacement(
       origin: CGPoint(x: originX, y: originY),
-      tailSide: tailSide
+      tailSide: tailSide,
+      tailCenterY: characterFrame.midY - originY
     )
   }
 

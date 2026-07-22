@@ -23,9 +23,17 @@ final class BubbleBackgroundView: NSView {
     }
   }
 
+  var tailCenterY: CGFloat? {
+    didSet {
+      needsDisplay = true
+    }
+  }
+
   private let scrollView: NSScrollView
   private let errorLabel = NSTextField(labelWithString: "")
   private let tailWidth: CGFloat = 18
+  private let tailHalfHeight: CGFloat = 14
+  private let cornerRadius: CGFloat = 18
 
   override init(frame frameRect: NSRect) {
     let scrollView = NSScrollView(frame: .zero)
@@ -137,10 +145,12 @@ final class BubbleBackgroundView: NSView {
 
   private func bubblePath() -> NSBezierPath {
     let rect = bodyRect
-    let radius = min(18, min(rect.width / 2, rect.height / 2))
+    let radius = min(cornerRadius, min(rect.width / 2, rect.height / 2))
     let cornerControl = radius * 0.552_284_75
-    let tailCenterY = bounds.midY
-    let tailHalfHeight: CGFloat = 14
+    let tailCenterY = resolvedTailCenterY(
+      rect: rect,
+      radius: radius
+    )
     let path = NSBezierPath()
 
     path.move(to: NSPoint(x: rect.minX + radius, y: rect.maxY))
@@ -188,6 +198,13 @@ final class BubbleBackgroundView: NSView {
 
     path.close()
     return path
+  }
+
+  private func resolvedTailCenterY(rect: NSRect, radius: CGFloat) -> CGFloat {
+    let minimum = rect.minY + radius + tailHalfHeight
+    let maximum = rect.maxY - radius - tailHalfHeight
+    guard maximum >= minimum else { return rect.midY }
+    return min(max(tailCenterY ?? rect.midY, minimum), maximum)
   }
 
   private func appendTopRightCorner(
