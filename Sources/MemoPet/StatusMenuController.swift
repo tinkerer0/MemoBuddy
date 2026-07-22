@@ -3,6 +3,7 @@ import AppKit
 struct StatusMenuState {
   var characterVisible: Bool
   var hasCustomCharacter: Bool
+  var selectedCharacter: CharacterChoice
   var scratchpadVisible: Bool
   var characterSize: CGFloat
 }
@@ -10,6 +11,7 @@ struct StatusMenuState {
 final class StatusMenuController: NSObject {
   var onToggleScratchpad: (() -> Void)?
   var onChooseCharacter: (() -> Void)?
+  var onSelectCharacter: ((CharacterChoice) -> Void)?
   var onResetCharacter: (() -> Void)?
   var onCenterCharacter: (() -> Void)?
   var onToggleCharacter: (() -> Void)?
@@ -48,9 +50,9 @@ final class StatusMenuController: NSObject {
       )
     )
     menu.addItem(.separator())
-    menu.addItem(
-      actionItem(title: "Change Character…", action: #selector(chooseCharacter))
-    )
+    let characterItem = NSMenuItem(title: "Character", action: nil, keyEquivalent: "")
+    characterItem.submenu = makeCharacterChoiceMenu(state: state)
+    menu.addItem(characterItem)
     let sizeRootItem = NSMenuItem(title: "Character Size", action: nil, keyEquivalent: "")
     sizeRootItem.submenu = makeSizeMenu(selectedSize: state.characterSize)
     menu.addItem(sizeRootItem)
@@ -75,9 +77,9 @@ final class StatusMenuController: NSObject {
       )
     )
     menu.addItem(.separator())
-    menu.addItem(
-      actionItem(title: "Change Character…", action: #selector(chooseCharacter))
-    )
+    let characterItem = NSMenuItem(title: "Character", action: nil, keyEquivalent: "")
+    characterItem.submenu = makeCharacterChoiceMenu(state: state)
+    menu.addItem(characterItem)
 
     let sizeItem = NSMenuItem(title: "Character Size", action: nil, keyEquivalent: "")
     sizeItem.submenu = makeSizeMenu(selectedSize: state.characterSize)
@@ -111,10 +113,32 @@ final class StatusMenuController: NSObject {
     return menu
   }
 
+  private func makeCharacterChoiceMenu(state: StatusMenuState) -> NSMenu {
+    let menu = NSMenu()
+    for choice in CharacterChoice.builtInChoices {
+      let item = actionItem(
+        title: choice.menuTitle,
+        action: #selector(selectCharacter(_:))
+      )
+      item.representedObject = choice.rawValue
+      item.state = state.selectedCharacter == choice ? .on : .off
+      menu.addItem(item)
+    }
+
+    menu.addItem(.separator())
+    let customItem = actionItem(
+      title: CharacterChoice.custom.menuTitle,
+      action: #selector(chooseCharacter)
+    )
+    customItem.state = state.selectedCharacter == .custom ? .on : .off
+    menu.addItem(customItem)
+    return menu
+  }
+
   private func makeMoreMenu(state: StatusMenuState) -> NSMenu {
     let menu = NSMenu()
     let resetItem = actionItem(
-      title: "Reset Character",
+      title: "Remove Custom Character",
       action: #selector(resetCharacter)
     )
     resetItem.isEnabled = state.hasCustomCharacter
@@ -137,6 +161,14 @@ final class StatusMenuController: NSObject {
 
   @objc private func toggleScratchpad() { onToggleScratchpad?() }
   @objc private func chooseCharacter() { onChooseCharacter?() }
+  @objc private func selectCharacter(_ sender: NSMenuItem) {
+    guard let rawValue = sender.representedObject as? String,
+      let choice = CharacterChoice(rawValue: rawValue)
+    else {
+      return
+    }
+    onSelectCharacter?(choice)
+  }
   @objc private func resetCharacter() { onResetCharacter?() }
   @objc private func centerCharacter() { onCenterCharacter?() }
   @objc private func toggleCharacter() { onToggleCharacter?() }

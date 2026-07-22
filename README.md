@@ -13,6 +13,7 @@ It was built to remove a small interruption from AI-assisted work: opening a sep
 - Click the character to open a speech-bubble scratchpad
 - Automatic local saving, including Korean, emoji, and line breaks
 - Animated GIF, PNG, JPEG, and WebP character support
+- Three bundled characters: Classic, Memo Writer, and Orbiting Planet
 - Drag to move; right-click to choose Small, Medium, or Large
 - Floats above apps and follows you across macOS Spaces
 - Menu bar controls for recovery and less-common actions
@@ -21,9 +22,18 @@ It was built to remove a small interruption from AI-assisted work: opening a sep
 ## Requirements
 
 - macOS 13 or later
-- Xcode Command Line Tools with Swift 5.9 or later
 
-## Build and run
+## Install
+
+1. Download `MemoPet.zip` from the [latest release](https://github.com/tinkerer0/MemoPet/releases/latest).
+2. Unzip it and move `MemoPet.app` to your Applications folder.
+3. Open MemoPet. Its note icon appears in the menu bar, and the character appears on the desktop.
+
+The release is a Universal app for both Apple Silicon and Intel Macs. MemoPet is not notarized yet, so macOS may block the first launch. After trying to open it once, go to **System Settings → Privacy & Security** and click **Open Anyway** only if you trust this repository and release.
+
+## Build from source
+
+Install Xcode Command Line Tools with Swift 5.9 or later, then run:
 
 ```bash
 git clone https://github.com/tinkerer0/MemoPet.git

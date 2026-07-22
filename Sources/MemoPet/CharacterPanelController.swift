@@ -13,7 +13,8 @@ final class CharacterPanelController: NSWindowController {
 
   private(set) var size: CGFloat
 
-  private(set) var asset: CharacterAsset?
+  private(set) var selectedCharacter: CharacterChoice = .memoWriter
+  private(set) var customAsset: CharacterAsset?
   private var systemSuspended = false
   private var shown = false
 
@@ -56,29 +57,34 @@ final class CharacterPanelController: NSWindowController {
     nil
   }
 
-  func setAsset(_ asset: CharacterAsset?) throws {
-    self.asset = asset
-    guard let asset else {
-      let defaultURL = Bundle.main.url(
-        forResource: "default-character",
-        withExtension: "gif"
-      ) ?? Bundle.module.url(
-        forResource: "default-character",
-        withExtension: "gif"
-      )
-      if let defaultURL, let defaultImage = NSImage(contentsOf: defaultURL) {
-        characterView.setImage(defaultImage, animated: true)
-        updatePlayback()
-      } else {
-        characterView.setImage(nil, animated: false)
+  func setCharacter(
+    _ choice: CharacterChoice,
+    customAsset: CharacterAsset? = nil
+  ) throws {
+    switch choice {
+    case .classic:
+      characterView.setImage(nil, animated: false)
+
+    case .memoWriter, .orbitingPlanet:
+      guard let resourceName = choice.bundledResourceName,
+        let url = bundledResourceURL(named: resourceName),
+        let image = NSImage(contentsOf: url)
+      else {
+        throw CharacterImageValidationError.unreadable
       }
-      return
+      characterView.setImage(image, animated: true)
+
+    case .custom:
+      guard let customAsset,
+        let image = NSImage(contentsOf: customAsset.url)
+      else {
+        throw CharacterImageValidationError.unreadable
+      }
+      characterView.setImage(image, animated: customAsset.metadata.isAnimated)
     }
 
-    guard let image = NSImage(contentsOf: asset.url) else {
-      throw CharacterImageValidationError.unreadable
-    }
-    characterView.setImage(image, animated: asset.metadata.isAnimated)
+    selectedCharacter = choice
+    self.customAsset = choice == .custom ? customAsset : nil
     updatePlayback()
   }
 
@@ -124,5 +130,10 @@ final class CharacterPanelController: NSWindowController {
     characterView.setPlaybackEnabled(
       shown && !systemSuspended
     )
+  }
+
+  private func bundledResourceURL(named name: String) -> URL? {
+    Bundle.main.url(forResource: name, withExtension: "gif")
+      ?? Bundle.module.url(forResource: name, withExtension: "gif")
   }
 }

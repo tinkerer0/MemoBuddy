@@ -11,6 +11,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   private var scratchpadController: ScratchpadPanelController?
   private var statusMenuController: StatusMenuController?
   private var animationLifecycle: AnimationLifecycle?
+  private var selectedCharacter: CharacterChoice = .memoWriter
+  private var customCharacterAsset: CharacterAsset?
 
   func applicationDidFinishLaunching(_ notification: Notification) {
     do {
@@ -50,16 +52,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let origin = initialCharacterOrigin()
     characterController.setOrigin(origin)
 
+    let customCharacterAsset: CharacterAsset?
     do {
-      try characterController.setAsset(characterStore.load())
+      customCharacterAsset = try characterStore.load()
     } catch {
+      customCharacterAsset = nil
       try? characterStore.reset()
-      try characterController.setAsset(nil)
       showError(
         title: "Could not load the saved character",
         error: error
       )
     }
+
+    let requestedCharacter = settings.characterChoice
+      ?? (customCharacterAsset == nil ? .memoWriter : .custom)
+    let initialCharacter: CharacterChoice = requestedCharacter == .custom
+      && customCharacterAsset == nil
+      ? .memoWriter
+      : requestedCharacter
+    try characterController.setCharacter(
+      initialCharacter,
+      customAsset: customCharacterAsset
+    )
+    self.customCharacterAsset = customCharacterAsset
+    selectedCharacter = initialCharacter
+    settings.characterChoice = initialCharacter
 
     if settings.isCharacterVisible {
       characterController.show()
@@ -90,6 +107,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
     statusMenuController?.onChooseCharacter = { [weak self] in
       self?.chooseCharacter()
+    }
+    statusMenuController?.onSelectCharacter = { [weak self] choice in
+      self?.selectCharacter(choice)
     }
     statusMenuController?.onResetCharacter = { [weak self] in
       self?.resetCharacter()
@@ -128,7 +148,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
   private func chooseCharacter() {
     let panel = NSOpenPanel()
-    panel.title = "Choose an animated GIF"
+    panel.title = "Choose a custom character"
     panel.prompt = "Use Character"
     panel.canChooseFiles = true
     panel.canChooseDirectories = false
@@ -152,7 +172,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     do {
       let asset = try characterStore.importImage(from: sourceURL)
-      try characterController.setAsset(asset)
+      try characterController.setCharacter(.custom, customAsset: asset)
+      customCharacterAsset = asset
+      selectedCharacter = .custom
+      settings.characterChoice = .custom
+
+      if !settings.isCharacterVisible {
+        settings.isCharacterVisible = true
+        characterController.show()
+      }
+      rebuildMenu()
+    } catch {
+      showError(title: "Could not use that character", error: error)
+    }
+  }
+
+  private func selectCharacter(_ choice: CharacterChoice) {
+    guard choice != .custom,
+      choice != selectedCharacter,
+      let characterController
+    else {
+      return
+    }
+
+    do {
+      try characterController.setCharacter(choice)
+      selectedCharacter = choice
+      settings.characterChoice = choice
 
       if !settings.isCharacterVisible {
         settings.isCharacterVisible = true
@@ -168,7 +214,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     guard let characterStore, let characterController else { return }
     do {
       try characterStore.reset()
-      try characterController.setAsset(nil)
+      customCharacterAsset = nil
+      if selectedCharacter == .custom {
+        try characterController.setCharacter(.memoWriter)
+        selectedCharacter = .memoWriter
+        settings.characterChoice = .memoWriter
+      }
       rebuildMenu()
     } catch {
       showError(title: "Could not reset the character", error: error)
@@ -293,7 +344,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   private func currentMenuState() -> StatusMenuState {
     StatusMenuState(
       characterVisible: settings.isCharacterVisible,
-      hasCustomCharacter: characterController?.asset != nil,
+      hasCustomCharacter: customCharacterAsset != nil,
+      selectedCharacter: selectedCharacter,
       scratchpadVisible: scratchpadController?.isShowingScratchpad == true,
       characterSize: characterController?.size ?? settings.characterSize
     )

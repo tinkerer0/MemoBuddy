@@ -7,6 +7,7 @@ final class AppSettings {
     static let hasCharacterOrigin = "hasCharacterOrigin"
     static let characterVisible = "characterVisible"
     static let characterSize = "characterSize"
+    static let characterChoice = "characterChoice"
   }
 
   private let defaults: UserDefaults
@@ -53,6 +54,22 @@ final class AppSettings {
     }
     set {
       defaults.set(Double(newValue), forKey: Key.characterSize)
+    }
+  }
+
+  var characterChoice: CharacterChoice? {
+    get {
+      guard let rawValue = defaults.string(forKey: Key.characterChoice) else {
+        return nil
+      }
+      return CharacterChoice(rawValue: rawValue)
+    }
+    set {
+      guard let newValue else {
+        defaults.removeObject(forKey: Key.characterChoice)
+        return
+      }
+      defaults.set(newValue.rawValue, forKey: Key.characterChoice)
     }
   }
 }
