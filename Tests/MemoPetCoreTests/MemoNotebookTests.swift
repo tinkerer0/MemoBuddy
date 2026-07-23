@@ -4,14 +4,15 @@ import XCTest
 @testable import MemoPetCore
 
 final class MemoNotebookTests: XCTestCase {
-  func testEmptyNotebookNormalizesToOneTextNote() {
+  func testEmptyNotebookNormalizesToOneBlankNote() {
     var notebook = MemoNotebook()
     notebook.notes = []
 
     notebook.normalize()
 
     XCTAssertEqual(notebook.notes.count, 1)
-    XCTAssertEqual(notebook.selectedNote.kind, .text)
+    XCTAssertEqual(notebook.selectedNote.text, "")
+    XCTAssertTrue(notebook.selectedNote.strokes.isEmpty)
     XCTAssertEqual(notebook.selectedIndex, 0)
   }
 
@@ -19,18 +20,19 @@ final class MemoNotebookTests: XCTestCase {
     var notebook = MemoNotebook()
     let originalID = notebook.selectedNoteID
 
-    let drawing = notebook.addNote(kind: .drawing)
+    let added = notebook.addNote()
 
     XCTAssertEqual(notebook.notes.count, 2)
-    XCTAssertEqual(notebook.selectedNoteID, drawing.id)
-    XCTAssertEqual(notebook.selectedNote.kind, .drawing)
+    XCTAssertEqual(notebook.selectedNoteID, added.id)
+    XCTAssertEqual(notebook.selectedNote.text, "")
+    XCTAssertTrue(notebook.selectedNote.strokes.isEmpty)
     XCTAssertNotEqual(notebook.selectedNoteID, originalID)
   }
 
   func testDeletingSelectedNoteChoosesTheNextAvailableNote() {
-    let first = MemoNote(kind: .text, text: "First")
-    let second = MemoNote(kind: .drawing)
-    let third = MemoNote(kind: .text, text: "Third")
+    let first = MemoNote(text: "First")
+    let second = MemoNote()
+    let third = MemoNote(text: "Third")
     var notebook = MemoNotebook(
       notes: [first, second, third],
       selectedNoteID: second.id
@@ -42,16 +44,43 @@ final class MemoNotebookTests: XCTestCase {
     XCTAssertEqual(notebook.selectedNoteID, third.id)
   }
 
-  func testDeletingOnlyNoteCreatesBlankTextReplacement() {
+  func testDeletingOnlyNoteCreatesBlankReplacement() {
     var notebook = MemoNotebook(
-      notes: [MemoNote(kind: .drawing)]
+      notes: [MemoNote(strokes: [MemoStroke(points: [MemoPoint(x: 0.5, y: 0.5)])])]
     )
 
     notebook.deleteSelectedNote()
 
     XCTAssertEqual(notebook.notes.count, 1)
-    XCTAssertEqual(notebook.selectedNote.kind, .text)
     XCTAssertEqual(notebook.selectedNote.text, "")
     XCTAssertTrue(notebook.selectedNote.strokes.isEmpty)
+  }
+
+  func testNormalizeRepairsDuplicateIDsAndOutOfBoundsDrawingPoints() {
+    let duplicateID = UUID()
+    var notebook = MemoNotebook(
+      version: 1,
+      notes: [
+        MemoNote(id: duplicateID),
+        MemoNote(
+          id: duplicateID,
+          strokes: [
+            MemoStroke(
+              points: [
+                MemoPoint(x: -20, y: 30)
+              ]
+            )
+          ]
+        ),
+      ],
+      selectedNoteID: duplicateID
+    )
+
+    notebook.normalize()
+
+    XCTAssertEqual(Set(notebook.notes.map(\.id)).count, 2)
+    XCTAssertEqual(notebook.notes[1].strokes[0].points[0], MemoPoint(x: 0, y: 1))
+    XCTAssertEqual(notebook.version, MemoNotebook.currentVersion)
+    XCTAssertEqual(notebook.selectedNoteID, duplicateID)
   }
 }

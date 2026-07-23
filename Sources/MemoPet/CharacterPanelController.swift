@@ -23,8 +23,9 @@ final class CharacterPanelController: NSWindowController {
   }
 
   init(size: CGFloat = CharacterPanelController.defaultSize) {
-    self.size = size
-    let windowSize = NSSize(width: size, height: size)
+    let initialSize = min(max(size.isFinite ? size : Self.defaultSize, 40), 160)
+    self.size = initialSize
+    let windowSize = NSSize(width: initialSize, height: initialSize)
     characterView = CharacterView(
       frame: NSRect(origin: .zero, size: windowSize)
     )
@@ -94,7 +95,8 @@ final class CharacterPanelController: NSWindowController {
 
   func setSize(_ newSize: CGFloat) {
     guard let window else { return }
-    let clampedSize = min(max(newSize, 40), 160)
+    let finiteSize = newSize.isFinite ? newSize : Self.defaultSize
+    let clampedSize = min(max(finiteSize, 40), 160)
     let oldFrame = window.frame
     let center = NSPoint(x: oldFrame.midX, y: oldFrame.midY)
     let newFrame = NSRect(

@@ -59,9 +59,61 @@ final class AnimatedImageValidatorTests: XCTestCase {
     XCTAssertTrue(FileManager.default.fileExists(atPath: imported.url.path))
     XCTAssertEqual(loaded?.metadata.frameCount, 2)
     XCTAssertEqual(loaded?.url.lastPathComponent, "character.gif")
+    XCTAssertEqual(try permissions(at: storeURL), 0o700)
+    XCTAssertEqual(try permissions(at: imported.url), 0o600)
 
     try store.reset()
     XCTAssertNil(try store.load())
+  }
+
+  func testUnreadableStoredCharacterIsNotDeletedAutomatically() throws {
+    let root = try makeTemporaryDirectory()
+    let storeURL = root.appendingPathComponent("store", isDirectory: true)
+    let store = try CharacterStore(directoryURL: storeURL)
+    let invalidURL = storeURL.appendingPathComponent("character.gif")
+    let invalidData = Data("not an image".utf8)
+    try invalidData.write(to: invalidURL, options: [.atomic])
+
+    XCTAssertTrue(store.hasStoredImage)
+    XCTAssertThrowsError(try store.load())
+    XCTAssertEqual(try Data(contentsOf: invalidURL), invalidData)
+  }
+
+  func testReplacingCharacterValidatesBeforeAtomicallyReplacingIt() throws {
+    let root = try makeTemporaryDirectory()
+    let firstURL = root.appendingPathComponent("first.gif")
+    let secondURL = root.appendingPathComponent("second.gif")
+    let storeURL = root.appendingPathComponent("store", isDirectory: true)
+    try writeGIF(to: firstURL, width: 8, height: 8, frameCount: 2)
+    try writeGIF(to: secondURL, width: 8, height: 8, frameCount: 4)
+    let store = try CharacterStore(directoryURL: storeURL)
+
+    try store.importImage(from: firstURL)
+    try store.importImage(from: secondURL)
+
+    XCTAssertEqual(try store.load()?.metadata.frameCount, 4)
+    let stagingFiles = try FileManager.default.contentsOfDirectory(
+      at: storeURL,
+      includingPropertiesForKeys: nil
+    ).filter { $0.lastPathComponent.hasPrefix(".character-import-") }
+    XCTAssertTrue(stagingFiles.isEmpty)
+  }
+
+  func testLoadSkipsDamagedCandidateWhenAnotherStoredImageIsValid() throws {
+    let root = try makeTemporaryDirectory()
+    let storeURL = root.appendingPathComponent("store", isDirectory: true)
+    let store = try CharacterStore(directoryURL: storeURL)
+    try Data("damaged".utf8).write(
+      to: storeURL.appendingPathComponent("character.gif"),
+      options: [.atomic]
+    )
+    let validURL = storeURL.appendingPathComponent("character.png")
+    try writeGIF(to: validURL, width: 8, height: 8, frameCount: 2)
+
+    let loaded = try store.load()
+
+    XCTAssertEqual(loaded?.url.lastPathComponent, "character.png")
+    XCTAssertEqual(loaded?.metadata.frameCount, 2)
   }
 
   private func makeTemporaryDirectory() throws -> URL {
@@ -72,6 +124,13 @@ final class AnimatedImageValidatorTests: XCTestCase {
       try? FileManager.default.removeItem(at: url)
     }
     return url
+  }
+
+  private func permissions(at url: URL) throws -> Int {
+    let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+    return try XCTUnwrap(
+      attributes[.posixPermissions] as? NSNumber
+    ).intValue & 0o777
   }
 
   private func writeGIF(

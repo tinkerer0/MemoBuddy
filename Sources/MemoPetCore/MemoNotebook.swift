@@ -1,10 +1,5 @@
 import Foundation
 
-public enum MemoNoteKind: String, Codable, Equatable {
-  case text
-  case drawing
-}
-
 public struct MemoPoint: Codable, Equatable {
   public var x: Double
   public var y: Double
@@ -25,25 +20,22 @@ public struct MemoStroke: Codable, Equatable {
 
 public struct MemoNote: Codable, Equatable, Identifiable {
   public var id: UUID
-  public var kind: MemoNoteKind
   public var text: String
   public var strokes: [MemoStroke]
 
   public init(
     id: UUID = UUID(),
-    kind: MemoNoteKind,
     text: String = "",
     strokes: [MemoStroke] = []
   ) {
     self.id = id
-    self.kind = kind
     self.text = text
     self.strokes = strokes
   }
 }
 
 public struct MemoNotebook: Codable, Equatable {
-  public static let currentVersion = 1
+  public static let currentVersion = 2
 
   public var version: Int
   public var notes: [MemoNote]
@@ -51,10 +43,10 @@ public struct MemoNotebook: Codable, Equatable {
 
   public init(
     version: Int = MemoNotebook.currentVersion,
-    notes: [MemoNote] = [MemoNote(kind: .text)],
+    notes: [MemoNote] = [MemoNote()],
     selectedNoteID: UUID? = nil
   ) {
-    let resolvedNotes = notes.isEmpty ? [MemoNote(kind: .text)] : notes
+    let resolvedNotes = notes.isEmpty ? [MemoNote()] : notes
     self.version = version
     self.notes = resolvedNotes
     self.selectedNoteID = selectedNoteID
@@ -72,14 +64,43 @@ public struct MemoNotebook: Codable, Equatable {
     notes[selectedIndex]
   }
 
-  public mutating func normalize() {
+  public mutating func normalize(sanitizeContent: Bool = true) {
     version = Self.currentVersion
 
     if notes.isEmpty {
-      let note = MemoNote(kind: .text)
+      let note = MemoNote()
       notes = [note]
       selectedNoteID = note.id
       return
+    }
+
+    var seenIDs = Set<UUID>()
+    for noteIndex in notes.indices {
+      if seenIDs.contains(notes[noteIndex].id) {
+        notes[noteIndex].id = UUID()
+      }
+      seenIDs.insert(notes[noteIndex].id)
+
+      if sanitizeContent {
+        for strokeIndex in notes[noteIndex].strokes.indices {
+          for pointIndex in notes[noteIndex].strokes[strokeIndex].points.indices {
+            notes[noteIndex].strokes[strokeIndex].points[pointIndex].x = min(
+              max(
+                notes[noteIndex].strokes[strokeIndex].points[pointIndex].x,
+                0
+              ),
+              1
+            )
+            notes[noteIndex].strokes[strokeIndex].points[pointIndex].y = min(
+              max(
+                notes[noteIndex].strokes[strokeIndex].points[pointIndex].y,
+                0
+              ),
+              1
+            )
+          }
+        }
+      }
     }
 
     if !notes.contains(where: { $0.id == selectedNoteID }) {
@@ -93,8 +114,8 @@ public struct MemoNotebook: Codable, Equatable {
   }
 
   @discardableResult
-  public mutating func addNote(kind: MemoNoteKind) -> MemoNote {
-    let note = MemoNote(kind: kind)
+  public mutating func addNote() -> MemoNote {
+    let note = MemoNote()
     notes.append(note)
     selectedNoteID = note.id
     return note
@@ -105,7 +126,7 @@ public struct MemoNotebook: Codable, Equatable {
     notes.remove(at: index)
 
     if notes.isEmpty {
-      let replacement = MemoNote(kind: .text)
+      let replacement = MemoNote()
       notes = [replacement]
       selectedNoteID = replacement.id
       return

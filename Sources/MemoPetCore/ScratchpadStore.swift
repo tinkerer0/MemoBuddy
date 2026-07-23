@@ -14,7 +14,17 @@ public final class ScratchpadStore {
       at: directoryURL,
       withIntermediateDirectories: true
     )
+    try fileManager.setAttributes(
+      [.posixPermissions: 0o700],
+      ofItemAtPath: directoryURL.path
+    )
     self.noteURL = directoryURL.appendingPathComponent("note.txt", isDirectory: false)
+    if fileManager.fileExists(atPath: noteURL.path) {
+      try fileManager.setAttributes(
+        [.posixPermissions: 0o600],
+        ofItemAtPath: noteURL.path
+      )
+    }
   }
 
   public func load() throws -> String {
@@ -29,5 +39,9 @@ public final class ScratchpadStore {
       throw CocoaError(.fileWriteInapplicableStringEncoding)
     }
     try data.write(to: noteURL, options: [.atomic])
+    try fileManager.setAttributes(
+      [.posixPermissions: 0o600],
+      ofItemAtPath: noteURL.path
+    )
   }
 }

@@ -1,0 +1,55 @@
+name: Bug report
+description: Report a reproducible MemoPet problem
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve MemoPet. Do not attach `notes.json`, custom character files, screenshots containing private notes, or other personal data unless you have reviewed and intentionally removed sensitive content.
+  - type: input
+    id: memopet-version
+    attributes:
+      label: MemoPet version
+      description: Find this in the downloaded release name or app information.
+      placeholder: 0.3.0
+    validations:
+      required: true
+  - type: input
+    id: macos-version
+    attributes:
+      label: macOS version and Mac
+      placeholder: macOS 15.5, Apple Silicon
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Explain the problem and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open MemoPet
+        2. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: data-loss
+    attributes:
+      label: Did this involve missing or damaged notes?
+      options:
+        - "No"
+        - "Yes"
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Additional context
+      description: Include sanitized screenshots or logs only if they contain no private note content.

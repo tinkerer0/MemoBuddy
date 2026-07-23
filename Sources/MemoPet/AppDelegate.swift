@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
   private let settings = AppSettings()
+  private let updateChecker = GitHubReleaseChecker()
 
   private var applicationSupportURL: URL?
   private var characterStore: CharacterStore?
@@ -13,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   private var animationLifecycle: AnimationLifecycle?
   private var selectedCharacter: CharacterChoice = .memoWriter
   private var customCharacterAsset: CharacterAsset?
+  private var isCheckingForUpdates = false
 
   func applicationDidFinishLaunching(_ notification: Notification) {
     do {
@@ -22,8 +24,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
   }
 
-  func applicationWillTerminate(_ notification: Notification) {
-    scratchpadController?.flushSave()
+  func applicationShouldTerminate(
+    _ sender: NSApplication
+  ) -> NSApplication.TerminateReply {
+    guard let scratchpadController else {
+      return .terminateNow
+    }
+    guard !scratchpadController.flushSave() else { return .terminateNow }
+
+    if let error = scratchpadController.lastSaveError {
+      showError(
+        title: "MemoPet could not save your notes",
+        error: error
+      )
+    }
+    return .terminateCancel
   }
 
   private func configureApplication() throws {
@@ -31,7 +46,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let characterStore = try CharacterStore(directoryURL: applicationSupportURL)
     let scratchpadStore = try MemoNotebookStore(directoryURL: applicationSupportURL)
     let characterController = CharacterPanelController(size: settings.characterSize)
-    let scratchpadController = try ScratchpadPanelController(store: scratchpadStore)
+    let scratchpadController = try ScratchpadPanelController(
+      store: scratchpadStore,
+      size: settings.memoSize
+    )
     let statusMenuController = StatusMenuController()
     let animationLifecycle = AnimationLifecycle()
 
@@ -44,6 +62,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     configureCharacterCallbacks()
     configureStatusMenuCallbacks()
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(screenParametersDidChange),
+      name: NSApplication.didChangeScreenParametersNotification,
+      object: nil
+    )
+    scratchpadController.onSizeChanged = { [weak self] size in
+      self?.settings.memoSize = size
+    }
 
     animationLifecycle.onSuspensionChanged = { [weak characterController] suspended in
       characterController?.setSystemSuspended(suspended)
@@ -57,7 +84,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       customCharacterAsset = try characterStore.load()
     } catch {
       customCharacterAsset = nil
-      try? characterStore.reset()
       showError(
         title: "Could not load the saved character",
         error: error
@@ -84,11 +110,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       characterController.hide()
     }
     rebuildMenu()
+    if let recoveryNotice = scratchpadStore.recoveryNotice {
+      DispatchQueue.main.async { [weak self] in
+        self?.showMessage(
+          title: "MemoPet recovered your notes",
+          message: recoveryNotice
+        )
+      }
+    }
+    checkForUpdatesAutomaticallyIfNeeded()
   }
 
   private func configureCharacterCallbacks() {
     characterController?.characterView.onClick = { [weak self] in
       self?.toggleScratchpad()
+    }
+    characterController?.characterView.onMove = { [weak self] origin in
+      self?.moveCharacter(origin: origin)
     }
     characterController?.characterView.onMoveEnded = { [weak self] origin in
       self?.finishCharacterMove(origin: origin)
@@ -125,6 +163,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
     statusMenuController?.onOpenDataFolder = { [weak self] in
       self?.openDataFolder()
+    }
+    statusMenuController?.onCheckForUpdates = { [weak self] in
+      self?.checkForUpdates(manual: true)
     }
     statusMenuController?.onQuit = {
       NSApp.terminate(nil)
@@ -242,13 +283,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
   private func toggleCharacterVisibility() {
     guard let characterController else { return }
-    settings.isCharacterVisible.toggle()
 
     if settings.isCharacterVisible {
-      characterController.show()
-    } else {
-      scratchpadController?.closeAndRestoreFocus()
+      guard scratchpadController?.closeAndRestoreFocus() != false else {
+        return
+      }
+      settings.isCharacterVisible = false
       characterController.hide()
+    } else {
+      settings.isCharacterVisible = true
+      characterController.show()
     }
     rebuildMenu()
   }
@@ -286,6 +330,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     repositionScratchpad()
   }
 
+  private func moveCharacter(origin: NSPoint) {
+    guard let characterController, let scratchpadController else { return }
+    let frame = NSRect(
+      origin: origin,
+      size: characterController.currentFrame.size
+    )
+    scratchpadController.reposition(
+      characterFrame: frame,
+      visibleFrame: screen(containing: frame).visibleFrame
+    )
+  }
+
+  @objc private func screenParametersDidChange() {
+    guard let characterController else { return }
+    let frame = characterController.currentFrame
+    let visibleFrame = screen(containing: frame).visibleFrame
+    let clampedOrigin = WindowPlacement.clampedOrigin(
+      frame.origin,
+      windowSize: frame.size,
+      visibleFrame: visibleFrame
+    )
+    characterController.setOrigin(clampedOrigin)
+    settings.characterOrigin = clampedOrigin
+    repositionScratchpad()
+  }
+
   private func repositionScratchpad() {
     guard let characterController, let scratchpadController else { return }
     let characterFrame = characterController.currentFrame
@@ -298,6 +368,113 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   private func openDataFolder() {
     guard let applicationSupportURL else { return }
     NSWorkspace.shared.open(applicationSupportURL)
+  }
+
+  private func checkForUpdatesAutomaticallyIfNeeded() {
+    guard UpdateCheckSchedule.shouldCheck(
+      lastCheck: settings.lastUpdateCheckDate
+    ) else { return }
+    checkForUpdates(manual: false)
+  }
+
+  private func checkForUpdates(manual: Bool) {
+    guard !isCheckingForUpdates else {
+      if manual {
+        showMessage(
+          title: "Already checking for updates",
+          message: "MemoPet is waiting for GitHub to respond."
+        )
+      }
+      return
+    }
+    guard let currentVersion = currentAppVersion else {
+      if manual {
+        showMessage(
+          title: "Could not check for updates",
+          message: "This build does not include version information."
+        )
+      }
+      return
+    }
+
+    isCheckingForUpdates = true
+    settings.lastUpdateCheckDate = Date()
+    updateChecker.check(currentVersion: currentVersion) { [weak self] result in
+      DispatchQueue.main.async {
+        self?.handleUpdateCheckResult(
+          result,
+          currentVersion: currentVersion,
+          manual: manual
+        )
+      }
+    }
+  }
+
+  private func handleUpdateCheckResult(
+    _ result: Result<UpdateCheckResult, Error>,
+    currentVersion: String,
+    manual: Bool
+  ) {
+    isCheckingForUpdates = false
+
+    switch result {
+    case let .failure(error):
+      if manual {
+        showError(title: "Could not check for updates", error: error)
+      }
+
+    case .success(.upToDate):
+      if manual {
+        showMessage(
+          title: "MemoPet is up to date",
+          message: "You are using MemoPet \(currentVersion)."
+        )
+      }
+
+    case let .success(.updateAvailable(update)):
+      if !manual, settings.lastNotifiedUpdateVersion == update.version {
+        return
+      }
+      settings.lastNotifiedUpdateVersion = update.version
+      showAvailableUpdate(update, currentVersion: currentVersion)
+    }
+  }
+
+  private var currentAppVersion: String? {
+    guard let version = Bundle.main.object(
+      forInfoDictionaryKey: "CFBundleShortVersionString"
+    ) as? String,
+      AppVersion(version) != nil
+    else {
+      return nil
+    }
+    return version
+  }
+
+  private func showAvailableUpdate(
+    _ update: AvailableUpdate,
+    currentVersion: String
+  ) {
+    let alert = NSAlert()
+    alert.alertStyle = .informational
+    alert.messageText = "MemoPet \(update.version) is available"
+    alert.informativeText = "You are using \(currentVersion). View the release to download the update."
+    alert.addButton(withTitle: "View Release")
+    alert.addButton(withTitle: "Later")
+    NSApp.activate(ignoringOtherApps: true)
+    if alert.runModal() == .alertFirstButtonReturn {
+      NSWorkspace.shared.open(update.releaseURL)
+    }
+  }
+
+  private func showMessage(title: String, message: String) {
+    let alert = NSAlert()
+    alert.alertStyle = .informational
+    alert.messageText = title
+    alert.informativeText = message
+    alert.addButton(withTitle: "OK")
+    NSApp.activate(ignoringOtherApps: true)
+    alert.runModal()
   }
 
   private func initialCharacterOrigin() -> NSPoint {
@@ -322,15 +499,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   }
 
   private func screen(containing frame: NSRect) -> NSScreen {
-    NSScreen.screens.max { lhs, rhs in
+    let screens = NSScreen.screens
+    if let intersecting = screens.max(by: { lhs, rhs in
       intersectionArea(lhs.frame, frame) < intersectionArea(rhs.frame, frame)
-    } ?? NSScreen.main ?? NSScreen.screens[0]
+    }), intersectionArea(intersecting.frame, frame) > 0 {
+      return intersecting
+    }
+
+    let center = NSPoint(x: frame.midX, y: frame.midY)
+    return screens.min { lhs, rhs in
+      squaredDistance(from: center, to: lhs.frame)
+        < squaredDistance(from: center, to: rhs.frame)
+    } ?? NSScreen.main ?? screens[0]
   }
 
   private func intersectionArea(_ lhs: NSRect, _ rhs: NSRect) -> CGFloat {
     let intersection = lhs.intersection(rhs)
     guard !intersection.isNull else { return 0 }
     return intersection.width * intersection.height
+  }
+
+  private func squaredDistance(from point: NSPoint, to rect: NSRect) -> CGFloat {
+    let dx = max(max(rect.minX - point.x, 0), point.x - rect.maxX)
+    let dy = max(max(rect.minY - point.y, 0), point.y - rect.maxY)
+    return (dx * dx) + (dy * dy)
   }
 
   private func rebuildMenu() {
@@ -344,7 +536,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   private func currentMenuState() -> StatusMenuState {
     StatusMenuState(
       characterVisible: settings.isCharacterVisible,
-      hasCustomCharacter: customCharacterAsset != nil,
+      hasCustomCharacter: characterStore?.hasStoredImage == true,
       selectedCharacter: selectedCharacter,
       scratchpadVisible: scratchpadController?.isShowingScratchpad == true,
       characterSize: characterController?.size ?? settings.characterSize

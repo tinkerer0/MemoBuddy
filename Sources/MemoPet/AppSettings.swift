@@ -8,6 +8,10 @@ final class AppSettings {
     static let characterVisible = "characterVisible"
     static let characterSize = "characterSize"
     static let characterChoice = "characterChoice"
+    static let memoWidth = "memoWidth"
+    static let memoHeight = "memoHeight"
+    static let lastUpdateCheckDate = "lastUpdateCheckDate"
+    static let lastNotifiedUpdateVersion = "lastNotifiedUpdateVersion"
   }
 
   private let defaults: UserDefaults
@@ -19,10 +23,10 @@ final class AppSettings {
   var characterOrigin: NSPoint? {
     get {
       guard defaults.bool(forKey: Key.hasCharacterOrigin) else { return nil }
-      return NSPoint(
-        x: defaults.double(forKey: Key.characterOriginX),
-        y: defaults.double(forKey: Key.characterOriginY)
-      )
+      let x = defaults.double(forKey: Key.characterOriginX)
+      let y = defaults.double(forKey: Key.characterOriginY)
+      guard x.isFinite, y.isFinite else { return nil }
+      return NSPoint(x: x, y: y)
     }
     set {
       guard let newValue else {
@@ -50,7 +54,8 @@ final class AppSettings {
   var characterSize: CGFloat {
     get {
       let value = defaults.double(forKey: Key.characterSize)
-      return value == 0 ? 80 : CGFloat(value)
+      guard value.isFinite, value > 0 else { return 80 }
+      return min(max(CGFloat(value), 40), 160)
     }
     set {
       defaults.set(Double(newValue), forKey: Key.characterSize)
@@ -70,6 +75,39 @@ final class AppSettings {
         return
       }
       defaults.set(newValue.rawValue, forKey: Key.characterChoice)
+    }
+  }
+
+  var memoSize: NSSize {
+    get {
+      let width = defaults.double(forKey: Key.memoWidth)
+      let height = defaults.double(forKey: Key.memoHeight)
+      guard width.isFinite, height.isFinite, width > 0, height > 0 else {
+        return NSSize(width: 360, height: 220)
+      }
+      return NSSize(width: width, height: height)
+    }
+    set {
+      defaults.set(Double(newValue.width), forKey: Key.memoWidth)
+      defaults.set(Double(newValue.height), forKey: Key.memoHeight)
+    }
+  }
+
+  var lastUpdateCheckDate: Date? {
+    get {
+      defaults.object(forKey: Key.lastUpdateCheckDate) as? Date
+    }
+    set {
+      defaults.set(newValue, forKey: Key.lastUpdateCheckDate)
+    }
+  }
+
+  var lastNotifiedUpdateVersion: String? {
+    get {
+      defaults.string(forKey: Key.lastNotifiedUpdateVersion)
+    }
+    set {
+      defaults.set(newValue, forKey: Key.lastNotifiedUpdateVersion)
     }
   }
 }

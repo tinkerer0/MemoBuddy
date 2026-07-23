@@ -5,6 +5,14 @@ final class DrawingNoteView: NSView {
   var onChange: (([MemoStroke]) -> Void)?
   var onEscape: (() -> Void)?
 
+  var isDrawingEnabled = false {
+    didSet {
+      guard isDrawingEnabled != oldValue else { return }
+      setAccessibilityEnabled(isDrawingEnabled)
+      window?.invalidateCursorRects(for: self)
+    }
+  }
+
   var strokes: [MemoStroke] = [] {
     didSet {
       needsDisplay = true
@@ -20,8 +28,11 @@ final class DrawingNoteView: NSView {
 
   override init(frame frameRect: NSRect) {
     super.init(frame: frameRect)
+    wantsLayer = true
+    layer?.backgroundColor = NSColor.clear.cgColor
     setAccessibilityElement(true)
     setAccessibilityLabel("Drawing note")
+    setAccessibilityEnabled(false)
   }
 
   @available(*, unavailable)
@@ -29,21 +40,15 @@ final class DrawingNoteView: NSView {
     nil
   }
 
+  override func hitTest(_ point: NSPoint) -> NSView? {
+    isDrawingEnabled && bounds.contains(point) ? self : nil
+  }
+
   override func draw(_ dirtyRect: NSRect) {
     super.draw(dirtyRect)
 
-    let canvasRect = bounds.insetBy(dx: 0.5, dy: 0.5)
-    let canvasPath = NSBezierPath(
-      roundedRect: canvasRect,
-      xRadius: 10,
-      yRadius: 10
-    )
-
-    NSColor.textBackgroundColor.setFill()
-    canvasPath.fill()
-
     NSGraphicsContext.saveGraphicsState()
-    canvasPath.addClip()
+    NSBezierPath(rect: bounds).addClip()
 
     NSColor.textColor.setStroke()
     NSColor.textColor.setFill()
@@ -55,13 +60,10 @@ final class DrawingNoteView: NSView {
     }
 
     NSGraphicsContext.restoreGraphicsState()
-
-    NSColor.separatorColor.setStroke()
-    canvasPath.lineWidth = 1
-    canvasPath.stroke()
   }
 
   override func mouseDown(with event: NSEvent) {
+    guard isDrawingEnabled else { return }
     window?.makeFirstResponder(self)
     currentStroke = MemoStroke(
       points: [normalizedPoint(from: event)]
@@ -70,10 +72,12 @@ final class DrawingNoteView: NSView {
   }
 
   override func mouseDragged(with event: NSEvent) {
+    guard isDrawingEnabled else { return }
     appendPoint(from: event)
   }
 
   override func mouseUp(with event: NSEvent) {
+    guard isDrawingEnabled else { return }
     appendPoint(from: event)
 
     guard let currentStroke, !currentStroke.points.isEmpty else {
@@ -106,7 +110,9 @@ final class DrawingNoteView: NSView {
 
   override func resetCursorRects() {
     super.resetCursorRects()
-    addCursorRect(bounds, cursor: .crosshair)
+    if isDrawingEnabled {
+      addCursorRect(bounds, cursor: .crosshair)
+    }
   }
 
   override func viewDidChangeEffectiveAppearance() {

@@ -15,6 +15,10 @@ public enum AppDirectories {
       at: directoryURL,
       withIntermediateDirectories: true
     )
+    try fileManager.setAttributes(
+      [.posixPermissions: 0o700],
+      ofItemAtPath: directoryURL.path
+    )
     return directoryURL
   }
 }

@@ -17,6 +17,7 @@ final class StatusMenuController: NSObject {
   var onToggleCharacter: (() -> Void)?
   var onSetCharacterSize: ((CGFloat) -> Void)?
   var onOpenDataFolder: (() -> Void)?
+  var onCheckForUpdates: (() -> Void)?
   var onQuit: (() -> Void)?
 
   private let statusItem: NSStatusItem
@@ -156,6 +157,13 @@ final class StatusMenuController: NSObject {
     menu.addItem(
       actionItem(title: "Open Data Folder", action: #selector(openDataFolder))
     )
+    menu.addItem(.separator())
+    menu.addItem(
+      actionItem(
+        title: "Check for Updates…",
+        action: #selector(checkForUpdates)
+      )
+    )
     return menu
   }
 
@@ -177,5 +185,6 @@ final class StatusMenuController: NSObject {
     onSetCharacterSize?(CGFloat(value))
   }
   @objc private func openDataFolder() { onOpenDataFolder?() }
+  @objc private func checkForUpdates() { onCheckForUpdates?() }
   @objc private func quit() { onQuit?() }
 }

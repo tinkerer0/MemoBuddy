@@ -3,6 +3,7 @@ import MemoPetCore
 
 final class CharacterView: NSView {
   var onClick: (() -> Void)?
+  var onMove: ((NSPoint) -> Void)?
   var onMoveEnded: ((NSPoint) -> Void)?
   var onImageDropped: ((URL) -> Void)?
   var contextMenuProvider: (() -> NSMenu?)?
@@ -124,12 +125,12 @@ final class CharacterView: NSView {
     guard didDrag || distance >= 5 else { return }
 
     didDrag = true
-    window.setFrameOrigin(
-      NSPoint(
-        x: dragStartWindowOrigin.x + deltaX,
-        y: dragStartWindowOrigin.y + deltaY
-      )
+    let newOrigin = NSPoint(
+      x: dragStartWindowOrigin.x + deltaX,
+      y: dragStartWindowOrigin.y + deltaY
     )
+    window.setFrameOrigin(newOrigin)
+    onMove?(newOrigin)
   }
 
   override func mouseUp(with event: NSEvent) {
