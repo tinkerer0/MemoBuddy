@@ -73,11 +73,11 @@ final class BubbleBackgroundView: NSView, NSPopoverDelegate {
   private let toolbarView = NSView(frame: .zero)
   private let toolbarSeparator = NSBox(frame: .zero)
   private let errorLabel = NSTextField(labelWithString: "")
-  private let notePickerButton = NSButton(
-    title: "1 / 1",
-    target: nil,
-    action: nil
+  private let noteListButton = BubbleBackgroundView.makeToolbarButton(
+    symbolName: "list.bullet",
+    accessibilityLabel: "Open memo list"
   )
+  private let noteCountLabel = NSTextField(labelWithString: "1/1")
   private let previousNoteButton = BubbleBackgroundView.makeToolbarButton(
     symbolName: "chevron.left",
     accessibilityLabel: "Previous note"
@@ -144,27 +144,19 @@ final class BubbleBackgroundView: NSView, NSPopoverDelegate {
     drawingView.autoresizingMask = [.width, .height]
     textView.addSubview(drawingView, positioned: .above, relativeTo: nil)
 
-    notePickerButton.image = NSImage(
-      systemSymbolName: "list.bullet",
-      accessibilityDescription: "Open memo list"
-    )
-    notePickerButton.imagePosition = .imageLeading
-    notePickerButton.font = .monospacedDigitSystemFont(
+    noteCountLabel.font = .monospacedDigitSystemFont(
       ofSize: 11,
       weight: .regular
     )
-    notePickerButton.alignment = .center
-    notePickerButton.isBordered = false
-    notePickerButton.bezelStyle = .inline
-    notePickerButton.focusRingType = .none
-    notePickerButton.contentTintColor = .secondaryLabelColor
-    notePickerButton.toolTip = "Open memo list"
-    notePickerButton.setAccessibilityLabel("Open memo list")
-    notePickerButton.target = self
-    notePickerButton.action = #selector(showNotePicker)
+    noteCountLabel.textColor = .secondaryLabelColor
+    noteCountLabel.alignment = .center
+    noteCountLabel.lineBreakMode = .byClipping
+    noteCountLabel.setAccessibilityLabel("Current note, 1 of 1")
 
     toolbarSeparator.boxType = .separator
 
+    noteListButton.target = self
+    noteListButton.action = #selector(showNotePicker)
     previousNoteButton.target = self
     previousNoteButton.action = #selector(showPreviousNote)
     nextNoteButton.target = self
@@ -192,8 +184,9 @@ final class BubbleBackgroundView: NSView, NSPopoverDelegate {
     errorLabel.lineBreakMode = .byTruncatingTail
     errorLabel.isHidden = true
 
+    toolbarView.addSubview(noteListButton)
     toolbarView.addSubview(previousNoteButton)
-    toolbarView.addSubview(notePickerButton)
+    toolbarView.addSubview(noteCountLabel)
     toolbarView.addSubview(nextNoteButton)
     toolbarView.addSubview(drawingButton)
     toolbarView.addSubview(eraserButton)
@@ -237,9 +230,10 @@ final class BubbleBackgroundView: NSView, NSPopoverDelegate {
       height: 1
     )
 
-    previousNoteButton.frame = NSRect(x: 0, y: 1, width: 20, height: 24)
-    notePickerButton.frame = NSRect(x: 24, y: 1, width: 70, height: 24)
-    nextNoteButton.frame = NSRect(x: 98, y: 1, width: 20, height: 24)
+    noteListButton.frame = NSRect(x: 0, y: 1, width: 24, height: 24)
+    previousNoteButton.frame = NSRect(x: 32, y: 1, width: 20, height: 24)
+    noteCountLabel.frame = NSRect(x: 56, y: 4, width: 50, height: 18)
+    nextNoteButton.frame = NSRect(x: 110, y: 1, width: 20, height: 24)
     eraserButton.frame = NSRect(
       x: toolbarView.bounds.maxX - 24,
       y: 1,
@@ -303,11 +297,11 @@ final class BubbleBackgroundView: NSView, NSPopoverDelegate {
 
     selectedNoteIndex = index
     notesForList = notes
-    notePickerButton.title = "\(index + 1)/\(total)"
+    noteCountLabel.stringValue = "\(index + 1)/\(total)"
     previousNoteButton.isEnabled = index > 0
     nextNoteButton.isEnabled = index + 1 < total
-    notePickerButton.setAccessibilityLabel(
-      "Open memo list, \(index + 1) of \(total)"
+    noteCountLabel.setAccessibilityLabel(
+      "Current note, \(index + 1) of \(total)"
     )
     if noteListPopover.isShown {
       noteListController.display(
@@ -373,8 +367,8 @@ final class BubbleBackgroundView: NSView, NSPopoverDelegate {
     )
     onNoteListVisibilityChanged?(true)
     noteListPopover.show(
-      relativeTo: notePickerButton.bounds,
-      of: notePickerButton,
+      relativeTo: noteListButton.bounds,
+      of: noteListButton,
       preferredEdge: .minY
     )
   }
