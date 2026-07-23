@@ -9,17 +9,20 @@ private final class ScratchpadPanel: NSPanel {
 final class ScratchpadPanelController: NSWindowController, NSTextViewDelegate {
   static let panelSize = NSSize(width: 360, height: 220)
 
-  private let store: ScratchpadStore
+  private let store: MemoNotebookStore
   private let bubbleView: BubbleBackgroundView
+  private var notebook: MemoNotebook
   private var saveTimer: Timer?
   private var previousApplication: NSRunningApplication?
+  private var isDisplayingNote = false
 
   var isShowingScratchpad: Bool {
     window?.isVisible == true
   }
 
-  init(store: ScratchpadStore) throws {
+  init(store: MemoNotebookStore) throws {
     self.store = store
+    self.notebook = try store.load()
     self.bubbleView = BubbleBackgroundView(
       frame: NSRect(origin: .zero, size: Self.panelSize)
     )
@@ -47,10 +50,29 @@ final class ScratchpadPanelController: NSWindowController, NSTextViewDelegate {
     super.init(window: panel)
 
     bubbleView.textView.delegate = self
-    bubbleView.textView.string = try store.load()
     bubbleView.textView.onEscape = { [weak self] in
       self?.closeAndRestoreFocus()
     }
+    bubbleView.drawingView.onEscape = { [weak self] in
+      self?.closeAndRestoreFocus()
+    }
+    bubbleView.drawingView.onChange = { [weak self] strokes in
+      self?.drawingDidChange(strokes)
+    }
+    bubbleView.onPreviousNote = { [weak self] in
+      self?.showPreviousNote()
+    }
+    bubbleView.onNextNote = { [weak self] in
+      self?.showNextNote()
+    }
+    bubbleView.onAddNote = { [weak self] kind in
+      self?.addNote(kind: kind)
+    }
+    bubbleView.onDeleteNote = { [weak self] in
+      self?.deleteSelectedNote()
+    }
+
+    displaySelectedNote(focusEditor: false)
   }
 
   @available(*, unavailable)
@@ -81,11 +103,7 @@ final class ScratchpadPanelController: NSWindowController, NSTextViewDelegate {
 
     NSApp.activate(ignoringOtherApps: true)
     panel.makeKeyAndOrderFront(nil)
-    panel.makeFirstResponder(bubbleView.textView)
-
-    let end = (bubbleView.textView.string as NSString).length
-    bubbleView.textView.setSelectedRange(NSRange(location: end, length: 0))
-    bubbleView.textView.scrollRangeToVisible(NSRange(location: end, length: 0))
+    bubbleView.focusActiveEditor(in: panel)
   }
 
   func closeAndRestoreFocus() {
@@ -113,10 +131,23 @@ final class ScratchpadPanelController: NSWindowController, NSTextViewDelegate {
   func flushSave() {
     saveTimer?.invalidate()
     saveTimer = nil
-    saveCurrentText()
+    syncVisibleEditorIntoNotebook()
+    saveNotebook()
   }
 
   func textDidChange(_ notification: Notification) {
+    guard !isDisplayingNote else { return }
+    updateSelectedText(bubbleView.currentText)
+    scheduleSave()
+  }
+
+  @objc private func saveTimerFired() {
+    saveTimer = nil
+    syncVisibleEditorIntoNotebook()
+    saveNotebook()
+  }
+
+  private func scheduleSave() {
     bubbleView.showError(nil)
     saveTimer?.invalidate()
 
@@ -131,14 +162,88 @@ final class ScratchpadPanelController: NSWindowController, NSTextViewDelegate {
     saveTimer = timer
   }
 
-  @objc private func saveTimerFired() {
-    saveTimer = nil
-    saveCurrentText()
+  private func drawingDidChange(_ strokes: [MemoStroke]) {
+    guard !isDisplayingNote else { return }
+    let index = notebook.selectedIndex
+    guard notebook.notes[index].kind == .drawing else { return }
+    notebook.notes[index].strokes = strokes
+    scheduleSave()
   }
 
-  private func saveCurrentText() {
+  private func showPreviousNote() {
+    selectNote(at: notebook.selectedIndex - 1)
+  }
+
+  private func showNextNote() {
+    selectNote(at: notebook.selectedIndex + 1)
+  }
+
+  private func selectNote(at index: Int) {
+    guard notebook.notes.indices.contains(index),
+      index != notebook.selectedIndex
+    else {
+      return
+    }
+
+    commitVisibleEditor()
+    notebook.select(at: index)
+    displaySelectedNote(focusEditor: true)
+    saveNotebook()
+  }
+
+  private func addNote(kind: MemoNoteKind) {
+    commitVisibleEditor()
+    notebook.addNote(kind: kind)
+    displaySelectedNote(focusEditor: true)
+    saveNotebook()
+  }
+
+  private func deleteSelectedNote() {
+    commitVisibleEditor()
+    notebook.deleteSelectedNote()
+    displaySelectedNote(focusEditor: true)
+    saveNotebook()
+  }
+
+  private func commitVisibleEditor() {
+    saveTimer?.invalidate()
+    saveTimer = nil
+    syncVisibleEditorIntoNotebook()
+  }
+
+  private func syncVisibleEditorIntoNotebook() {
+    let index = notebook.selectedIndex
+    switch notebook.notes[index].kind {
+    case .text:
+      notebook.notes[index].text = bubbleView.currentText
+    case .drawing:
+      notebook.notes[index].strokes = bubbleView.currentStrokes
+    }
+  }
+
+  private func updateSelectedText(_ text: String) {
+    let index = notebook.selectedIndex
+    guard notebook.notes[index].kind == .text else { return }
+    notebook.notes[index].text = text
+  }
+
+  private func displaySelectedNote(focusEditor: Bool) {
+    isDisplayingNote = true
+    bubbleView.display(
+      note: notebook.selectedNote,
+      index: notebook.selectedIndex,
+      total: notebook.notes.count
+    )
+    isDisplayingNote = false
+
+    if focusEditor, let window, window.isVisible {
+      bubbleView.focusActiveEditor(in: window)
+    }
+  }
+
+  private func saveNotebook() {
     do {
-      try store.save(bubbleView.textView.string)
+      try store.save(notebook)
       bubbleView.showError(nil)
     } catch {
       bubbleView.showError("Could not save: \(error.localizedDescription)")

@@ -4,14 +4,16 @@
   <img src="Sources/MemoPet/Resources/default-character.gif" width="112" alt="MemoPet writing a memo" />
 </p>
 
-MemoPet is a tiny animated scratchpad that stays above your macOS apps.
+MemoPet is a tiny animated notebook that stays above your macOS apps.
 
-It was built to remove a small interruption from AI-assisted work: opening a separate notes app whenever you need to capture a quick thought. Click the little GIF character to open a speech-bubble memo, then get straight back to what you were doing.
+It was built to remove a small interruption from AI-assisted work: opening a separate notes app whenever you need to capture a quick thought or sketch. Click the little GIF character to open a speech-bubble note, then get straight back to what you were doing.
 
 ## Features
 
-- Click the character to open a speech-bubble scratchpad
-- Automatic local saving, including Korean, emoji, and line breaks
+- Click the character to open a speech-bubble notebook
+- Add lightweight text or freehand drawing notes
+- Move between notes with compact previous and next controls
+- Automatic local saving, including Korean, emoji, line breaks, and drawings
 - Animated GIF, PNG, JPEG, and WebP character support
 - Three bundled characters: Classic, Memo Writer, and Orbiting Planet
 - Drag to move; right-click to choose Small, Medium, or Large
@@ -59,6 +61,10 @@ swift test
 | Action | Control |
 | --- | --- |
 | Open or close memo | Click the character |
+| Add a text or drawing note | Click `+` in the memo |
+| Move between notes | Click the left or right arrow |
+| Undo a drawing stroke | Press <kbd>⌘Z</kbd> or use `…` |
+| Clear or delete a note | Use `…` |
 | Move character | Drag the character |
 | Change character or size | Right-click the character |
 | Close memo | Press Escape |
@@ -69,6 +75,8 @@ Notes and custom characters are stored locally in:
 ```text
 ~/Library/Application Support/MemoPet/
 ```
+
+Existing `note.txt` content is automatically carried into the first text note. The original file is left in place.
 
 The bundled mascot is part of this repository. You are responsible for the rights to any custom image you choose to use.
 

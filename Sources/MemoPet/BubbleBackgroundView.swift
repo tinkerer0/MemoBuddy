@@ -15,6 +15,12 @@ final class ScratchpadTextView: NSTextView {
 
 final class BubbleBackgroundView: NSView {
   let textView: ScratchpadTextView
+  let drawingView: DrawingNoteView
+
+  var onPreviousNote: (() -> Void)?
+  var onNextNote: (() -> Void)?
+  var onAddNote: ((MemoNoteKind) -> Void)?
+  var onDeleteNote: (() -> Void)?
 
   var tailSide: BubbleTailSide = .left {
     didSet {
@@ -30,18 +36,40 @@ final class BubbleBackgroundView: NSView {
   }
 
   private let scrollView: NSScrollView
+  private let toolbarView = NSView(frame: .zero)
+  private let toolbarSeparator = NSBox(frame: .zero)
   private let errorLabel = NSTextField(labelWithString: "")
+  private let noteCountLabel = NSTextField(labelWithString: "1 / 1")
+  private let previousButton = BubbleBackgroundView.makeToolbarButton(
+    symbolName: "chevron.left",
+    accessibilityLabel: "Previous note"
+  )
+  private let nextButton = BubbleBackgroundView.makeToolbarButton(
+    symbolName: "chevron.right",
+    accessibilityLabel: "Next note"
+  )
+  private let addButton = BubbleBackgroundView.makeToolbarButton(
+    symbolName: "plus.circle",
+    accessibilityLabel: "Add note"
+  )
+  private let moreButton = BubbleBackgroundView.makeToolbarButton(
+    symbolName: "ellipsis",
+    accessibilityLabel: "More note actions"
+  )
   private let tailWidth: CGFloat = 18
   private let tailHalfHeight: CGFloat = 14
   private let cornerRadius: CGFloat = 18
+  private var activeKind: MemoNoteKind = .text
 
   override init(frame frameRect: NSRect) {
     let scrollView = NSScrollView(frame: .zero)
     let textView = ScratchpadTextView(frame: .zero)
+    let drawingView = DrawingNoteView(frame: .zero)
     scrollView.documentView = textView
 
     self.scrollView = scrollView
     self.textView = textView
+    self.drawingView = drawingView
     super.init(frame: frameRect)
 
     wantsLayer = true
@@ -65,12 +93,43 @@ final class BubbleBackgroundView: NSView {
     textView.isVerticallyResizable = true
     textView.textContainer?.widthTracksTextView = true
 
+    drawingView.isHidden = true
+
+    noteCountLabel.font = .monospacedDigitSystemFont(
+      ofSize: 11,
+      weight: .regular
+    )
+    noteCountLabel.textColor = .secondaryLabelColor
+    noteCountLabel.alignment = .center
+    noteCountLabel.lineBreakMode = .byClipping
+    noteCountLabel.setAccessibilityLabel("Current note")
+
+    toolbarSeparator.boxType = .separator
+
+    previousButton.target = self
+    previousButton.action = #selector(showPreviousNote)
+    nextButton.target = self
+    nextButton.action = #selector(showNextNote)
+    addButton.target = self
+    addButton.action = #selector(showAddMenu)
+    moreButton.target = self
+    moreButton.action = #selector(showMoreMenu)
+
     errorLabel.font = .systemFont(ofSize: 11, weight: .medium)
     errorLabel.textColor = .systemRed
     errorLabel.lineBreakMode = .byTruncatingTail
     errorLabel.isHidden = true
 
+    toolbarView.addSubview(previousButton)
+    toolbarView.addSubview(noteCountLabel)
+    toolbarView.addSubview(nextButton)
+    toolbarView.addSubview(addButton)
+    toolbarView.addSubview(moreButton)
+
     addSubview(scrollView)
+    addSubview(drawingView)
+    addSubview(toolbarSeparator)
+    addSubview(toolbarView)
     addSubview(errorLabel)
   }
 
@@ -84,18 +143,53 @@ final class BubbleBackgroundView: NSView {
 
     let body = bodyRect.insetBy(dx: 12, dy: 10)
     let errorHeight: CGFloat = errorLabel.isHidden ? 0 : 18
+    let toolbarHeight: CGFloat = 26
+    let editorBottom = body.minY + errorHeight
+
     errorLabel.frame = NSRect(
       x: body.minX + 4,
       y: body.minY,
       width: body.width - 8,
       height: errorHeight
     )
-    scrollView.frame = NSRect(
-      x: body.minX,
-      y: body.minY + errorHeight,
-      width: body.width,
-      height: max(0, body.height - errorHeight)
+
+    toolbarView.frame = NSRect(
+      x: body.minX + 4,
+      y: body.maxY - toolbarHeight,
+      width: body.width - 8,
+      height: toolbarHeight
     )
+    toolbarSeparator.frame = NSRect(
+      x: body.minX + 4,
+      y: toolbarView.frame.minY - 4,
+      width: body.width - 8,
+      height: 1
+    )
+
+    previousButton.frame = NSRect(x: 0, y: 1, width: 24, height: 24)
+    noteCountLabel.frame = NSRect(x: 25, y: 4, width: 48, height: 18)
+    nextButton.frame = NSRect(x: 74, y: 1, width: 24, height: 24)
+    moreButton.frame = NSRect(
+      x: toolbarView.bounds.maxX - 24,
+      y: 1,
+      width: 24,
+      height: 24
+    )
+    addButton.frame = NSRect(
+      x: moreButton.frame.minX - 28,
+      y: 1,
+      width: 24,
+      height: 24
+    )
+
+    let editorFrame = NSRect(
+      x: body.minX + 4,
+      y: editorBottom,
+      width: body.width - 8,
+      height: max(0, toolbarSeparator.frame.minY - 5 - editorBottom)
+    )
+    scrollView.frame = editorFrame
+    drawingView.frame = editorFrame
   }
 
   override func draw(_ dirtyRect: NSRect) {
@@ -122,6 +216,178 @@ final class BubbleBackgroundView: NSView {
     errorLabel.stringValue = message ?? ""
     errorLabel.isHidden = message == nil
     needsLayout = true
+  }
+
+  func display(note: MemoNote, index: Int, total: Int) {
+    activeKind = note.kind
+    textView.string = note.text
+    drawingView.strokes = note.strokes
+
+    scrollView.isHidden = note.kind != .text
+    drawingView.isHidden = note.kind != .drawing
+    noteCountLabel.stringValue = "\(index + 1) / \(total)"
+    previousButton.isEnabled = index > 0
+    nextButton.isEnabled = index + 1 < total
+    showError(nil)
+  }
+
+  func focusActiveEditor(in window: NSWindow) {
+    switch activeKind {
+    case .text:
+      window.makeFirstResponder(textView)
+      let end = (textView.string as NSString).length
+      textView.setSelectedRange(NSRange(location: end, length: 0))
+      textView.scrollRangeToVisible(NSRange(location: end, length: 0))
+    case .drawing:
+      window.makeFirstResponder(drawingView)
+    }
+  }
+
+  var currentText: String {
+    textView.string
+  }
+
+  var currentStrokes: [MemoStroke] {
+    drawingView.strokes
+  }
+
+  @objc private func showPreviousNote() {
+    onPreviousNote?()
+  }
+
+  @objc private func showNextNote() {
+    onNextNote?()
+  }
+
+  @objc private func showAddMenu() {
+    let menu = NSMenu()
+    menu.autoenablesItems = false
+
+    let textItem = NSMenuItem(
+      title: "Text Note",
+      action: #selector(addTextNote),
+      keyEquivalent: ""
+    )
+    textItem.target = self
+    textItem.image = NSImage(
+      systemSymbolName: "note.text",
+      accessibilityDescription: nil
+    )
+    menu.addItem(textItem)
+
+    let drawingItem = NSMenuItem(
+      title: "Drawing Note",
+      action: #selector(addDrawingNote),
+      keyEquivalent: ""
+    )
+    drawingItem.target = self
+    drawingItem.image = NSImage(
+      systemSymbolName: "pencil.and.outline",
+      accessibilityDescription: nil
+    )
+    menu.addItem(drawingItem)
+
+    popUp(menu, from: addButton)
+  }
+
+  @objc private func showMoreMenu() {
+    let menu = NSMenu()
+    menu.autoenablesItems = false
+
+    if activeKind == .drawing {
+      let undoItem = NSMenuItem(
+        title: "Undo Last Stroke",
+        action: #selector(undoLastStroke),
+        keyEquivalent: ""
+      )
+      undoItem.target = self
+      undoItem.isEnabled = !drawingView.strokes.isEmpty
+      undoItem.image = NSImage(
+        systemSymbolName: "arrow.uturn.backward",
+        accessibilityDescription: nil
+      )
+      menu.addItem(undoItem)
+
+      let clearItem = NSMenuItem(
+        title: "Clear Drawing",
+        action: #selector(clearDrawing),
+        keyEquivalent: ""
+      )
+      clearItem.target = self
+      clearItem.isEnabled = !drawingView.strokes.isEmpty
+      clearItem.image = NSImage(
+        systemSymbolName: "eraser",
+        accessibilityDescription: nil
+      )
+      menu.addItem(clearItem)
+      menu.addItem(.separator())
+    }
+
+    let deleteItem = NSMenuItem(
+      title: "Delete Note",
+      action: #selector(deleteNote),
+      keyEquivalent: ""
+    )
+    deleteItem.target = self
+    deleteItem.image = NSImage(
+      systemSymbolName: "trash",
+      accessibilityDescription: nil
+    )
+    menu.addItem(deleteItem)
+
+    popUp(menu, from: moreButton)
+  }
+
+  @objc private func addTextNote() {
+    onAddNote?(.text)
+  }
+
+  @objc private func addDrawingNote() {
+    onAddNote?(.drawing)
+  }
+
+  @objc private func undoLastStroke() {
+    drawingView.undoLastStroke()
+  }
+
+  @objc private func clearDrawing() {
+    drawingView.clearDrawing()
+  }
+
+  @objc private func deleteNote() {
+    onDeleteNote?()
+  }
+
+  private func popUp(_ menu: NSMenu, from button: NSButton) {
+    menu.popUp(
+      positioning: nil,
+      at: NSPoint(x: button.bounds.minX, y: button.bounds.minY - 4),
+      in: button
+    )
+  }
+
+  private static func makeToolbarButton(
+    symbolName: String,
+    accessibilityLabel: String
+  ) -> NSButton {
+    let button = NSButton(frame: .zero)
+    let configuration = NSImage.SymbolConfiguration(
+      pointSize: 12,
+      weight: .medium
+    )
+    button.image = NSImage(
+      systemSymbolName: symbolName,
+      accessibilityDescription: accessibilityLabel
+    )?.withSymbolConfiguration(configuration)
+    button.imagePosition = .imageOnly
+    button.imageScaling = .scaleProportionallyDown
+    button.isBordered = false
+    button.bezelStyle = .inline
+    button.focusRingType = .none
+    button.contentTintColor = .secondaryLabelColor
+    button.toolTip = accessibilityLabel
+    button.setAccessibilityLabel(accessibilityLabel)
+    return button
   }
 
   private var bodyRect: NSRect {

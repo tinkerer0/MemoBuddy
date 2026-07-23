@@ -29,7 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   private func configureApplication() throws {
     let applicationSupportURL = try AppDirectories.applicationSupportURL()
     let characterStore = try CharacterStore(directoryURL: applicationSupportURL)
-    let scratchpadStore = try ScratchpadStore(directoryURL: applicationSupportURL)
+    let scratchpadStore = try MemoNotebookStore(directoryURL: applicationSupportURL)
     let characterController = CharacterPanelController(size: settings.characterSize)
     let scratchpadController = try ScratchpadPanelController(store: scratchpadStore)
     let statusMenuController = StatusMenuController()
