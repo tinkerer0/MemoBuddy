@@ -88,6 +88,13 @@ final class StatusMenuController: NSObject {
     menu.addItem(.separator())
     menu.addItem(
       actionItem(
+        title: "Check for Updates…",
+        action: #selector(checkForUpdates)
+      )
+    )
+    menu.addItem(.separator())
+    menu.addItem(
+      actionItem(
         title: "Quit MemoPet",
         action: #selector(quit),
         key: "q"

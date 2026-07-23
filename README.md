@@ -87,7 +87,7 @@ Create the clean Universal release archive with:
 | Close memo | Click elsewhere or press Escape |
 | Move character | Drag the character |
 | Resize memo | Drag any memo edge or corner |
-| Change character, size, or quit | Right-click the character |
+| Change character, size, check for updates, or quit | Right-click the character |
 | Updates, recovery, and extra actions | Use the menu bar icon |
 
 Notes and custom characters are stored locally in:
