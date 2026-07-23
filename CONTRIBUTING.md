@@ -28,11 +28,12 @@ A user-facing MemoPet update is complete only after all of these steps:
 2. Run `swift test` and `./scripts/package-release.sh`.
 3. Push the release commit to `main` and wait for CI to pass.
 4. Create the matching `vX.Y.Z` tag and GitHub Release.
-5. Attach the verified `dist/MemoPet.zip` archive to the Release.
+5. Verify that GitHub's automatically generated source archives are available.
 
 Pushing a commit alone does not notify installed apps. Publish a numbered
 GitHub Release only for a build intended for users, so development commits do
-not produce unnecessary update notices.
+not produce unnecessary update notices. Do not attach a prebuilt app while
+MemoPet is distributed as source code only.
 
 ## Pull requests
 

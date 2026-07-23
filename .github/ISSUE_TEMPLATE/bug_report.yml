@@ -12,8 +12,8 @@ body:
     id: memopet-version
     attributes:
       label: MemoPet version
-      description: Find this in the downloaded release name or app information.
-      placeholder: 0.4.0
+      description: In Finder, select MemoPet.app and choose File → Get Info.
+      placeholder: Shown as Version in Finder
     validations:
       required: true
   - type: input

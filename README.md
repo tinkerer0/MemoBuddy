@@ -10,6 +10,9 @@ MemoPet is a tiny animated notebook that stays above your macOS apps.
 
 It was built to remove a small interruption from AI-assisted work: opening a separate notes app whenever you need to capture a quick thought or sketch. Click the little GIF character to open a speech-bubble note, then get straight back to what you were doing.
 
+> [!NOTE]
+> MemoPet is currently distributed as open-source code. There is no supported one-click installer yet. Build and run it locally with the copy-and-paste commands below.
+
 ## Features
 
 - Click the character to open a speech-bubble notebook
@@ -31,41 +34,42 @@ It was built to remove a small interruption from AI-assisted work: opening a sep
 ## Requirements
 
 - macOS 13 or later
+- Xcode Command Line Tools with Swift 5.9 or later
 
-## Install
+## Build and run
 
-1. Download `MemoPet.zip` from the [latest release](https://github.com/tinkerer0/MemoPet/releases/latest).
-2. Unzip it and move `MemoPet.app` to your Applications folder.
-3. Open MemoPet. Its note icon appears in the menu bar, and the character appears on the desktop.
+Open Terminal and copy and paste:
 
-The release is a Universal app for both Apple Silicon and Intel Macs. MemoPet is not notarized yet, so macOS may block the first launch. After trying to open it once, go to **System Settings → Privacy & Security** and click **Open Anyway** only if you trust this repository and release.
-
-## Build from source
-
-Install Xcode Command Line Tools with Swift 5.9 or later, then run:
-
-```bash
+```sh
 git clone https://github.com/tinkerer0/MemoPet.git
 cd MemoPet
 ./scripts/build-app.sh
 open dist/MemoPet.app
 ```
 
+These commands download the source, build a local Universal app, and open it. MemoPet then appears as a note icon in the menu bar and a character on the desktop.
+
+If `git` or `swift` is unavailable, install Apple's command-line tools first:
+
+```sh
+xcode-select --install
+```
+
 For development, you can run it directly with Swift Package Manager:
 
-```bash
+```sh
 swift run MemoPet
 ```
 
 Run the tests with:
 
-```bash
+```sh
 swift test
 ```
 
-Create the clean Universal release archive with:
+Create a local Universal archive for testing with:
 
-```bash
+```sh
 ./scripts/package-release.sh
 ```
 
@@ -116,7 +120,7 @@ MemoPet uses semantic versions. Bug fixes increment the last number (`v0.3.1`, `
 
 ## Status
 
-MemoPet is an early macOS preview. The downloadable app is ad-hoc signed, not notarized, and not App Sandbox-enforced yet. Launch-at-login is not implemented yet.
+MemoPet is an early open-source macOS preview. Building from source is the supported way to run it. Existing prebuilt archives are experimental, ad-hoc signed, not notarized, and may be blocked by macOS. Launch-at-login and App Sandbox enforcement are not implemented yet.
 
 ## Contributing and security
 
