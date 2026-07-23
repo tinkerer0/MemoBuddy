@@ -22,6 +22,8 @@ final class ScratchpadPanelController:
   private var previousApplication: NSRunningApplication?
   private var isDisplayingNote = false
   private var isApplyingPlacement = false
+  private var isClosing = false
+  private var isPresentingNoteList = false
   private var lastCharacterFrame: NSRect?
   private var lastVisibleFrame: NSRect?
 
@@ -84,17 +86,20 @@ final class ScratchpadPanelController:
     bubbleView.drawingView.onCoordinateMigration = { [weak self] strokes in
       self?.drawingCoordinatesDidMigrate(strokes)
     }
-    bubbleView.onPreviousNote = { [weak self] in
-      self?.showPreviousNote()
+    bubbleView.onSelectNote = { [weak self] index in
+      self?.selectNote(at: index)
     }
-    bubbleView.onNextNote = { [weak self] in
-      self?.showNextNote()
+    bubbleView.onRenameNote = { [weak self] index, title in
+      self?.renameNote(at: index, title: title)
     }
     bubbleView.onAddNote = { [weak self] in
       self?.addNote()
     }
-    bubbleView.onClose = { [weak self] in
-      self?.closeAndRestoreFocus()
+    bubbleView.onDeleteNote = { [weak self] index in
+      self?.deleteNote(at: index)
+    }
+    bubbleView.onNoteListVisibilityChanged = { [weak self] isVisible in
+      self?.noteListVisibilityDidChange(isVisible)
     }
 
     displaySelectedNote(focusEditor: false)
@@ -133,15 +138,7 @@ final class ScratchpadPanelController:
 
   @discardableResult
   func closeAndRestoreFocus() -> Bool {
-    guard flushSave() else { return false }
-    window?.orderOut(nil)
-    onVisibilityChanged?(false)
-
-    if let previousApplication, !previousApplication.isTerminated {
-      previousApplication.activate(options: [.activateIgnoringOtherApps])
-    }
-    previousApplication = nil
-    return true
+    close(restorePreviousApplication: true)
   }
 
   func reposition(characterFrame: NSRect, visibleFrame: NSRect) {
@@ -208,14 +205,6 @@ final class ScratchpadPanelController:
     }
   }
 
-  private func showPreviousNote() {
-    selectNote(at: notebook.selectedIndex - 1)
-  }
-
-  private func showNextNote() {
-    selectNote(at: notebook.selectedIndex + 1)
-  }
-
   private func selectNote(at index: Int) {
     guard notebook.notes.indices.contains(index),
       index != notebook.selectedIndex
@@ -225,7 +214,7 @@ final class ScratchpadPanelController:
 
     commitVisibleEditor()
     notebook.select(at: index)
-    displaySelectedNote(focusEditor: true)
+    displaySelectedNote(focusEditor: !isPresentingNoteList)
     saveNotebook()
   }
 
@@ -236,26 +225,50 @@ final class ScratchpadPanelController:
     saveNotebook()
   }
 
-  func deleteSelectedNote() {
-    commitVisibleEditor()
-    let selectedNote = notebook.selectedNote
-    if !selectedNote.text.isEmpty || !selectedNote.strokes.isEmpty {
-      let alert = NSAlert()
-      alert.alertStyle = .warning
-      alert.messageText = "Delete this note?"
-      alert.informativeText = "The note's text and drawing will be removed."
-      alert.addButton(withTitle: "Delete Note")
-      alert.addButton(withTitle: "Cancel")
-      alert.buttons.first?.hasDestructiveAction = true
-      guard alert.runModal() == .alertFirstButtonReturn else {
-        saveNotebook()
-        return
-      }
-    }
+  private func renameNote(at index: Int, title: String) {
+    guard notebook.notes.indices.contains(index) else { return }
+    let trimmedTitle = title.trimmingCharacters(
+      in: .whitespacesAndNewlines
+    )
+    let normalizedTitle = trimmedTitle.isEmpty
+      ? nil
+      : String(trimmedTitle.prefix(80))
+    notebook.notes[index].title = normalizedTitle
+    bubbleView.updateCachedNoteTitle(
+      at: index,
+      title: normalizedTitle
+    )
+    scheduleSave()
+  }
 
-    notebook.deleteSelectedNote()
+  private func deleteNote(at index: Int) {
+    guard notebook.notes.indices.contains(index) else { return }
+    commitVisibleEditor()
+
+    guard notebook.notes.count > 1 || !notebook.notes[index].isEmpty else {
+      return
+    }
+    notebook.deleteNote(at: index)
     displaySelectedNote(focusEditor: true)
     saveNotebook()
+  }
+
+  private func noteListVisibilityDidChange(_ isVisible: Bool) {
+    isPresentingNoteList = isVisible
+    guard !isVisible else { return }
+
+    DispatchQueue.main.async { [weak self] in
+      guard let self,
+        !self.isPresentingNoteList,
+        !self.isClosing,
+        let panel = self.window,
+        panel.isVisible,
+        !panel.isKeyWindow
+      else {
+        return
+      }
+      self.close(restorePreviousApplication: false)
+    }
   }
 
   private func commitVisibleEditor() {
@@ -280,9 +293,8 @@ final class ScratchpadPanelController:
   private func displaySelectedNote(focusEditor: Bool) {
     isDisplayingNote = true
     bubbleView.display(
-      note: notebook.selectedNote,
-      index: notebook.selectedIndex,
-      total: notebook.notes.count
+      notes: notebook.notes,
+      index: notebook.selectedIndex
     )
     isDisplayingNote = false
 
@@ -334,6 +346,43 @@ final class ScratchpadPanelController:
       )
     }
     onSizeChanged?(panel.frame.size)
+  }
+
+  func windowDidResignKey(_ notification: Notification) {
+    guard !isClosing,
+      !isPresentingNoteList,
+      let panel = notification.object as? NSWindow,
+      panel.isVisible
+    else {
+      return
+    }
+
+    close(restorePreviousApplication: false)
+  }
+
+  @discardableResult
+  private func close(restorePreviousApplication: Bool) -> Bool {
+    guard !isClosing else { return true }
+    guard flushSave() else {
+      NSApp.activate(ignoringOtherApps: true)
+      window?.makeKeyAndOrderFront(nil)
+      return false
+    }
+
+    isClosing = true
+    window?.orderOut(nil)
+    isClosing = false
+    onVisibilityChanged?(false)
+
+    let applicationToRestore = previousApplication
+    previousApplication = nil
+    if restorePreviousApplication,
+      let applicationToRestore,
+      !applicationToRestore.isTerminated
+    {
+      applicationToRestore.activate(options: [.activateIgnoringOtherApps])
+    }
+    return true
   }
 
   private func applyPlacement(

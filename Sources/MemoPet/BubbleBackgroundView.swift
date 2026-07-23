@@ -3,24 +3,57 @@ import MemoPetCore
 
 final class ScratchpadTextView: NSTextView {
   var onEscape: (() -> Void)?
+  var canvasCursor: NSCursor? {
+    didSet {
+      window?.invalidateCursorRects(for: self)
+    }
+  }
 
   override func keyDown(with event: NSEvent) {
     if event.keyCode == 53, !hasMarkedText() {
       onEscape?()
       return
     }
+
+    let modifiers = event.modifierFlags.intersection([
+      .command,
+      .shift,
+      .option,
+      .control,
+    ])
+    if !hasMarkedText(),
+      event.charactersIgnoringModifiers?.lowercased() == "z"
+    {
+      if modifiers == .command {
+        undoManager?.undo()
+        return
+      }
+      if modifiers == [.command, .shift] {
+        undoManager?.redo()
+        return
+      }
+    }
+
     super.keyDown(with: event)
+  }
+
+  override func resetCursorRects() {
+    super.resetCursorRects()
+    if let canvasCursor {
+      addCursorRect(visibleRect, cursor: canvasCursor)
+    }
   }
 }
 
-final class BubbleBackgroundView: NSView {
+final class BubbleBackgroundView: NSView, NSPopoverDelegate {
   let textView: ScratchpadTextView
   let drawingView: DrawingNoteView
 
-  var onPreviousNote: (() -> Void)?
-  var onNextNote: (() -> Void)?
+  var onSelectNote: ((Int) -> Void)?
+  var onRenameNote: ((Int, String) -> Void)?
+  var onDeleteNote: ((Int) -> Void)?
   var onAddNote: (() -> Void)?
-  var onClose: (() -> Void)?
+  var onNoteListVisibilityChanged: ((Bool) -> Void)?
 
   var tailSide: BubbleTailSide = .left {
     didSet {
@@ -36,38 +69,44 @@ final class BubbleBackgroundView: NSView {
   }
 
   private let scrollView: NSScrollView
+  private let noteListController = NoteListPopoverController()
   private let toolbarView = NSView(frame: .zero)
   private let toolbarSeparator = NSBox(frame: .zero)
   private let errorLabel = NSTextField(labelWithString: "")
-  private let noteCountLabel = NSTextField(labelWithString: "1 / 1")
-  private let previousButton = BubbleBackgroundView.makeToolbarButton(
+  private let notePickerButton = NSButton(
+    title: "1 / 1",
+    target: nil,
+    action: nil
+  )
+  private let previousNoteButton = BubbleBackgroundView.makeToolbarButton(
     symbolName: "chevron.left",
     accessibilityLabel: "Previous note"
   )
-  private let nextButton = BubbleBackgroundView.makeToolbarButton(
+  private let nextNoteButton = BubbleBackgroundView.makeToolbarButton(
     symbolName: "chevron.right",
     accessibilityLabel: "Next note"
-  )
-  private let addButton = BubbleBackgroundView.makeToolbarButton(
-    symbolName: "plus.circle",
-    accessibilityLabel: "Add note"
   )
   private let drawingButton = BubbleBackgroundView.makeToolbarButton(
     symbolName: "pencil.tip",
     accessibilityLabel: "Draw on note"
   )
-  private let clearDrawingButton = BubbleBackgroundView.makeToolbarButton(
+  private let eraserButton = BubbleBackgroundView.makeToolbarButton(
     symbolName: "eraser",
-    accessibilityLabel: "Clear drawing"
-  )
-  private let closeButton = BubbleBackgroundView.makeToolbarButton(
-    symbolName: "xmark",
-    accessibilityLabel: "Close memo"
+    accessibilityLabel: "Erase drawing"
   )
   private let tailWidth: CGFloat = 18
   private let tailHalfHeight: CGFloat = 14
   private let cornerRadius: CGFloat = 18
-  private var isDrawingMode = false
+  private var activeDrawingTool: DrawingNoteTool = .inactive
+  private var notesForList: [MemoNote] = []
+  private var selectedNoteIndex = 0
+  private lazy var noteListPopover: NSPopover = {
+    let popover = NSPopover()
+    popover.contentViewController = noteListController
+    popover.behavior = .transient
+    popover.delegate = self
+    return popover
+  }()
 
   override init(frame frameRect: NSRect) {
     let scrollView = NSScrollView(frame: .zero)
@@ -105,42 +144,59 @@ final class BubbleBackgroundView: NSView {
     drawingView.autoresizingMask = [.width, .height]
     textView.addSubview(drawingView, positioned: .above, relativeTo: nil)
 
-    noteCountLabel.font = .monospacedDigitSystemFont(
+    notePickerButton.image = NSImage(
+      systemSymbolName: "list.bullet",
+      accessibilityDescription: "Open memo list"
+    )
+    notePickerButton.imagePosition = .imageLeading
+    notePickerButton.font = .monospacedDigitSystemFont(
       ofSize: 11,
       weight: .regular
     )
-    noteCountLabel.textColor = .secondaryLabelColor
-    noteCountLabel.alignment = .center
-    noteCountLabel.lineBreakMode = .byClipping
-    noteCountLabel.setAccessibilityLabel("Current note")
+    notePickerButton.alignment = .center
+    notePickerButton.isBordered = false
+    notePickerButton.bezelStyle = .inline
+    notePickerButton.focusRingType = .none
+    notePickerButton.contentTintColor = .secondaryLabelColor
+    notePickerButton.toolTip = "Open memo list"
+    notePickerButton.setAccessibilityLabel("Open memo list")
+    notePickerButton.target = self
+    notePickerButton.action = #selector(showNotePicker)
 
     toolbarSeparator.boxType = .separator
 
-    previousButton.target = self
-    previousButton.action = #selector(showPreviousNote)
-    nextButton.target = self
-    nextButton.action = #selector(showNextNote)
-    addButton.target = self
-    addButton.action = #selector(addNote)
+    previousNoteButton.target = self
+    previousNoteButton.action = #selector(showPreviousNote)
+    nextNoteButton.target = self
+    nextNoteButton.action = #selector(showNextNote)
     drawingButton.target = self
     drawingButton.action = #selector(toggleDrawingMode)
-    clearDrawingButton.target = self
-    clearDrawingButton.action = #selector(clearDrawing)
-    closeButton.target = self
-    closeButton.action = #selector(closeMemo)
+    eraserButton.target = self
+    eraserButton.action = #selector(toggleEraserMode)
+    noteListController.onSelectNote = { [weak self] index in
+      self?.onSelectNote?(index)
+    }
+    noteListController.onRenameNote = { [weak self] index, title in
+      self?.onRenameNote?(index, title)
+    }
+    noteListController.onDeleteNote = { [weak self] index in
+      self?.onDeleteNote?(index)
+    }
+    noteListController.onAddNote = { [weak self] in
+      self?.onAddNote?()
+      self?.noteListPopover.performClose(nil)
+    }
 
     errorLabel.font = .systemFont(ofSize: 11, weight: .medium)
     errorLabel.textColor = .systemRed
     errorLabel.lineBreakMode = .byTruncatingTail
     errorLabel.isHidden = true
 
-    toolbarView.addSubview(previousButton)
-    toolbarView.addSubview(noteCountLabel)
-    toolbarView.addSubview(nextButton)
-    toolbarView.addSubview(addButton)
+    toolbarView.addSubview(previousNoteButton)
+    toolbarView.addSubview(notePickerButton)
+    toolbarView.addSubview(nextNoteButton)
     toolbarView.addSubview(drawingButton)
-    toolbarView.addSubview(clearDrawingButton)
-    toolbarView.addSubview(closeButton)
+    toolbarView.addSubview(eraserButton)
 
     addSubview(scrollView)
     addSubview(toolbarSeparator)
@@ -181,34 +237,21 @@ final class BubbleBackgroundView: NSView {
       height: 1
     )
 
-    previousButton.frame = NSRect(x: 0, y: 1, width: 24, height: 24)
-    noteCountLabel.frame = NSRect(x: 25, y: 4, width: 48, height: 18)
-    nextButton.frame = NSRect(x: 74, y: 1, width: 24, height: 24)
-    closeButton.frame = NSRect(
+    previousNoteButton.frame = NSRect(x: 0, y: 1, width: 20, height: 24)
+    notePickerButton.frame = NSRect(x: 24, y: 1, width: 70, height: 24)
+    nextNoteButton.frame = NSRect(x: 98, y: 1, width: 20, height: 24)
+    eraserButton.frame = NSRect(
       x: toolbarView.bounds.maxX - 24,
       y: 1,
       width: 24,
       height: 24
     )
-    clearDrawingButton.frame = NSRect(
-      x: closeButton.frame.minX - 28,
-      y: 1,
-      width: 24,
-      height: 24
-    )
     drawingButton.frame = NSRect(
-      x: clearDrawingButton.frame.minX - 28,
+      x: eraserButton.frame.minX - 28,
       y: 1,
       width: 24,
       height: 24
     )
-    addButton.frame = NSRect(
-      x: drawingButton.frame.minX - 28,
-      y: 1,
-      width: 24,
-      height: 24
-    )
-
     let editorFrame = NSRect(
       x: body.minX + 4,
       y: editorBottom,
@@ -233,8 +276,6 @@ final class BubbleBackgroundView: NSView {
     path.lineWidth = 1
     path.lineJoinStyle = .round
     path.stroke()
-
-    drawResizeGrip()
   }
 
   override func viewDidChangeEffectiveAppearance() {
@@ -248,8 +289,11 @@ final class BubbleBackgroundView: NSView {
     needsLayout = true
   }
 
-  func display(note: MemoNote, index: Int, total: Int) {
-    setDrawingMode(false, focusEditor: false)
+  func display(notes: [MemoNote], index: Int) {
+    guard notes.indices.contains(index) else { return }
+    let note = notes[index]
+    let total = notes.count
+    setDrawingTool(.inactive, focusEditor: false)
     textView.string = note.text
     textView.undoManager?.removeAllActions()
     drawingView.display(
@@ -257,18 +301,25 @@ final class BubbleBackgroundView: NSView {
       coordinateSpace: note.drawingCoordinateSpace
     )
 
-    noteCountLabel.stringValue = "\(index + 1) / \(total)"
-    previousButton.isEnabled = index > 0
-    nextButton.isEnabled = index + 1 < total
-    let showsNavigation = total > 1
-    previousButton.isHidden = !showsNavigation
-    noteCountLabel.isHidden = !showsNavigation
-    nextButton.isHidden = !showsNavigation
+    selectedNoteIndex = index
+    notesForList = notes
+    notePickerButton.title = "\(index + 1)/\(total)"
+    previousNoteButton.isEnabled = index > 0
+    nextNoteButton.isEnabled = index + 1 < total
+    notePickerButton.setAccessibilityLabel(
+      "Open memo list, \(index + 1) of \(total)"
+    )
+    if noteListPopover.isShown {
+      noteListController.display(
+        notes: notes,
+        selectedIndex: index
+      )
+    }
     showError(nil)
   }
 
   func focusActiveEditor(in window: NSWindow) {
-    if isDrawingMode {
+    if activeDrawingTool != .inactive {
       window.makeFirstResponder(drawingView)
     } else {
       window.makeFirstResponder(textView)
@@ -290,49 +341,96 @@ final class BubbleBackgroundView: NSView {
     drawingView.coordinateSpace
   }
 
+  func updateCachedNoteTitle(at index: Int, title: String?) {
+    guard notesForList.indices.contains(index) else { return }
+    notesForList[index].title = title
+  }
+
   @objc private func showPreviousNote() {
-    onPreviousNote?()
+    guard selectedNoteIndex > 0 else { return }
+    onSelectNote?(selectedNoteIndex - 1)
   }
 
   @objc private func showNextNote() {
-    onNextNote?()
+    guard selectedNoteIndex + 1 < notesForList.count else { return }
+    onSelectNote?(selectedNoteIndex + 1)
   }
 
-  @objc private func addNote() {
-    onAddNote?()
+  @objc private func showNotePicker() {
+    if noteListPopover.isShown {
+      noteListPopover.performClose(nil)
+      return
+    }
+
+    var currentNotes = notesForList
+    if currentNotes.indices.contains(selectedNoteIndex) {
+      currentNotes[selectedNoteIndex].text = textView.string
+      currentNotes[selectedNoteIndex].strokes = drawingView.strokes
+    }
+    noteListController.display(
+      notes: currentNotes,
+      selectedIndex: selectedNoteIndex
+    )
+    onNoteListVisibilityChanged?(true)
+    noteListPopover.show(
+      relativeTo: notePickerButton.bounds,
+      of: notePickerButton,
+      preferredEdge: .minY
+    )
   }
 
   @objc private func toggleDrawingMode() {
-    setDrawingMode(!isDrawingMode, focusEditor: true)
+    setDrawingTool(
+      activeDrawingTool == .draw ? .inactive : .draw,
+      focusEditor: true
+    )
   }
 
-  @objc private func clearDrawing() {
-    guard !drawingView.strokes.isEmpty else { return }
-    let alert = NSAlert()
-    alert.alertStyle = .warning
-    alert.messageText = "Clear this drawing?"
-    alert.informativeText = "This removes every stroke from the current note."
-    alert.addButton(withTitle: "Clear Drawing")
-    alert.addButton(withTitle: "Cancel")
-    alert.buttons.first?.hasDestructiveAction = true
-    guard alert.runModal() == .alertFirstButtonReturn else { return }
-    drawingView.clearDrawing()
+  @objc private func toggleEraserMode() {
+    setDrawingTool(
+      activeDrawingTool == .erase ? .inactive : .erase,
+      focusEditor: true
+    )
   }
 
-  @objc private func closeMemo() {
-    onClose?()
+  func popoverDidClose(_ notification: Notification) {
+    noteListController.dismissDeleteConfirmation()
+    onNoteListVisibilityChanged?(false)
   }
 
-  private func setDrawingMode(_ enabled: Bool, focusEditor: Bool) {
-    isDrawingMode = enabled
-    drawingView.isDrawingEnabled = enabled
-    drawingButton.state = enabled ? .on : .off
-    drawingButton.contentTintColor = enabled
+  private func setDrawingTool(
+    _ tool: DrawingNoteTool,
+    focusEditor: Bool
+  ) {
+    activeDrawingTool = tool
+    let usesDrawingTool = tool != .inactive
+    textView.isEditable = !usesDrawingTool
+    textView.isSelectable = !usesDrawingTool
+    drawingView.activeTool = tool
+    textView.canvasCursor = drawingView.cursorForActiveTool
+    if let window {
+      window.invalidateCursorRects(for: textView)
+      window.invalidateCursorRects(for: drawingView)
+    }
+    drawingButton.state = tool == .draw ? .on : .off
+    drawingButton.contentTintColor = tool == .draw
       ? .controlAccentColor
       : .secondaryLabelColor
-    drawingButton.toolTip = enabled ? "Return to text" : "Draw on note"
+    drawingButton.toolTip = tool == .draw
+      ? "Return to text"
+      : "Draw on note"
     drawingButton.setAccessibilityLabel(
-      enabled ? "Return to text" : "Draw on note"
+      tool == .draw ? "Return to text" : "Draw on note"
+    )
+    eraserButton.state = tool == .erase ? .on : .off
+    eraserButton.contentTintColor = tool == .erase
+      ? .controlAccentColor
+      : .secondaryLabelColor
+    eraserButton.toolTip = tool == .erase
+      ? "Return to text"
+      : "Erase drawing"
+    eraserButton.setAccessibilityLabel(
+      tool == .erase ? "Return to text" : "Erase drawing"
     )
 
     if focusEditor, let window {
@@ -362,35 +460,6 @@ final class BubbleBackgroundView: NSView {
     button.toolTip = accessibilityLabel
     button.setAccessibilityLabel(accessibilityLabel)
     return button
-  }
-
-  private func drawResizeGrip() {
-    let inset: CGFloat = 8
-    let spacing: CGFloat = 4
-    let anchorX = tailSide == .left
-      ? bodyRect.maxX - inset
-      : bodyRect.minX + inset
-    let direction: CGFloat = tailSide == .left ? -1 : 1
-
-    NSColor.tertiaryLabelColor.withAlphaComponent(0.55).setStroke()
-    for index in 1...3 {
-      let offset = CGFloat(index) * spacing
-      let path = NSBezierPath()
-      path.move(
-        to: NSPoint(
-          x: anchorX + (direction * offset),
-          y: bodyRect.minY + inset
-        )
-      )
-      path.line(
-        to: NSPoint(
-          x: anchorX,
-          y: bodyRect.minY + inset + offset
-        )
-      )
-      path.lineWidth = 1
-      path.stroke()
-    }
   }
 
   private var bodyRect: NSRect {

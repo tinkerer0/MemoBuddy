@@ -56,6 +56,34 @@ final class MemoNotebookTests: XCTestCase {
     XCTAssertTrue(notebook.selectedNote.strokes.isEmpty)
   }
 
+  func testDeletingAnotherNoteKeepsTheCurrentSelection() {
+    let first = MemoNote(title: "First")
+    let second = MemoNote(title: "Second")
+    let third = MemoNote(title: "Third")
+    var notebook = MemoNotebook(
+      notes: [first, second, third],
+      selectedNoteID: second.id
+    )
+
+    notebook.deleteNote(at: 0)
+
+    XCTAssertEqual(notebook.notes.map(\.id), [second.id, third.id])
+    XCTAssertEqual(notebook.selectedNoteID, second.id)
+  }
+
+  func testNoteIsEmptyOnlyWhenItHasNoTitleTextOrDrawing() {
+    XCTAssertTrue(MemoNote().isEmpty)
+    XCTAssertFalse(MemoNote(title: "Title").isEmpty)
+    XCTAssertFalse(MemoNote(text: "Text").isEmpty)
+    XCTAssertFalse(
+      MemoNote(
+        strokes: [
+          MemoStroke(points: [MemoPoint(x: 1, y: 1)])
+        ]
+      ).isEmpty
+    )
+  }
+
   func testNormalizeRepairsDuplicateIDsAndNegativeAbsoluteDrawingPoints() {
     let duplicateID = UUID()
     var notebook = MemoNotebook(
@@ -165,5 +193,82 @@ final class MemoNotebookTests: XCTestCase {
       notebook.selectedNote.drawingCoordinateSpace,
       .absolutePoints
     )
+  }
+
+  func testEraserDragSplitsAStrokeWithoutJoiningAcrossTheGap() {
+    let strokes = [
+      MemoStroke(
+        points: [
+          MemoPoint(x: 0, y: 0),
+          MemoPoint(x: 10, y: 0),
+          MemoPoint(x: 20, y: 0),
+          MemoPoint(x: 30, y: 0),
+        ]
+      )
+    ]
+
+    let erased = MemoDrawingEraser.erasing(
+      strokes: strokes,
+      from: MemoPoint(x: 15, y: -5),
+      to: MemoPoint(x: 15, y: 5),
+      radius: 2
+    )
+
+    XCTAssertEqual(
+      erased,
+      [
+        MemoStroke(
+          points: [
+            MemoPoint(x: 0, y: 0),
+            MemoPoint(x: 10, y: 0),
+          ]
+        ),
+        MemoStroke(
+          points: [
+            MemoPoint(x: 20, y: 0),
+            MemoPoint(x: 30, y: 0),
+          ]
+        ),
+      ]
+    )
+  }
+
+  func testEraserRemovesOnlyTouchedDots() {
+    let strokes = [
+      MemoStroke(points: [MemoPoint(x: 5, y: 5)]),
+      MemoStroke(points: [MemoPoint(x: 30, y: 30)]),
+    ]
+
+    let erased = MemoDrawingEraser.erasing(
+      strokes: strokes,
+      from: MemoPoint(x: 5, y: 5),
+      to: MemoPoint(x: 5, y: 5),
+      radius: 4
+    )
+
+    XCTAssertEqual(
+      erased,
+      [MemoStroke(points: [MemoPoint(x: 30, y: 30)])]
+    )
+  }
+
+  func testEraserLeavesDistantStrokesUnchanged() {
+    let strokes = [
+      MemoStroke(
+        points: [
+          MemoPoint(x: 0, y: 0),
+          MemoPoint(x: 20, y: 0),
+        ]
+      )
+    ]
+
+    let erased = MemoDrawingEraser.erasing(
+      strokes: strokes,
+      from: MemoPoint(x: 100, y: 100),
+      to: MemoPoint(x: 120, y: 100),
+      radius: 8
+    )
+
+    XCTAssertEqual(erased, strokes)
   }
 }

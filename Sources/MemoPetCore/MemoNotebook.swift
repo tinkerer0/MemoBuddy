@@ -51,25 +51,34 @@ public enum MemoDrawingCoordinates {
 
 public struct MemoNote: Codable, Equatable, Identifiable {
   public var id: UUID
+  public var title: String?
   public var text: String
   public var strokes: [MemoStroke]
   public var drawingCoordinateSpace: MemoDrawingCoordinateSpace?
 
   public init(
     id: UUID = UUID(),
+    title: String? = nil,
     text: String = "",
     strokes: [MemoStroke] = [],
     drawingCoordinateSpace: MemoDrawingCoordinateSpace? = .absolutePoints
   ) {
     self.id = id
+    self.title = title
     self.text = text
     self.strokes = strokes
     self.drawingCoordinateSpace = drawingCoordinateSpace
   }
+
+  public var isEmpty: Bool {
+    title?.isEmpty != false
+      && text.isEmpty
+      && strokes.isEmpty
+  }
 }
 
 public struct MemoNotebook: Codable, Equatable {
-  public static let currentVersion = 3
+  public static let currentVersion = 4
 
   public var version: Int
   public var notes: [MemoNote]
@@ -156,7 +165,12 @@ public struct MemoNotebook: Codable, Equatable {
   }
 
   public mutating func deleteSelectedNote() {
-    let index = selectedIndex
+    deleteNote(at: selectedIndex)
+  }
+
+  public mutating func deleteNote(at index: Int) {
+    guard notes.indices.contains(index) else { return }
+    let deletedNoteID = notes[index].id
     notes.remove(at: index)
 
     if notes.isEmpty {
@@ -166,6 +180,8 @@ public struct MemoNotebook: Codable, Equatable {
       return
     }
 
-    selectedNoteID = notes[min(index, notes.count - 1)].id
+    if selectedNoteID == deletedNoteID {
+      selectedNoteID = notes[min(index, notes.count - 1)].id
+    }
   }
 }

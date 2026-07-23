@@ -13,9 +13,10 @@ It was built to remove a small interruption from AI-assisted work: opening a sep
 ## Features
 
 - Click the character to open a speech-bubble notebook
+- Click elsewhere to save and close the memo automatically
 - Type and draw together in the same note
-- Add blank notes with one click and switch drawing mode with the pencil
-- Move between notes with compact previous and next controls
+- Add, title, choose, and delete notes from one compact notes list with inline confirmation
+- Switch between pencil and circular eraser tools
 - Automatic local saving, including Korean, emoji, line breaks, and drawings
 - Resize the memo from its edges; its size is remembered and drawings keep their scale
 - Animated GIF, PNG, JPEG, and WebP character support
@@ -73,13 +74,16 @@ Create the clean Universal release archive with:
 | Action | Control |
 | --- | --- |
 | Open or close memo | Click the character |
-| Add a blank note | Click `+` in the memo |
+| Open the notes list | Click the list and note count at the top left |
+| Add a blank note | Click `+` in the notes list |
+| Title a note | Right-click or double-click its title in the memo list |
 | Draw on the current note | Toggle the pencil in the memo |
-| Move between notes | Click the left or right arrow |
-| Undo a drawing stroke | Press <kbd>⌘Z</kbd> |
-| Clear the current drawing | Click the eraser in the memo |
-| Delete the current note | Use **Menu Bar → More → Delete Current Note…** |
-| Close memo | Click `×` or press Escape |
+| Move between notes | Use the arrows beside the note count or select one from the memo list |
+| Undo text or a drawing action | Press <kbd>⌘Z</kbd> in its editing mode |
+| Redo text | Press <kbd>⇧⌘Z</kbd> in text mode |
+| Erase part of a drawing | Toggle the eraser, then drag over the drawing |
+| Delete a note | Click its trash icon, then confirm in that note's row |
+| Close memo | Click elsewhere or press Escape |
 | Move character | Drag the character |
 | Resize memo | Drag any memo edge or corner |
 | Change character or size | Right-click the character |

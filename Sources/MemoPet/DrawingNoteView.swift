@@ -1,15 +1,26 @@
 import AppKit
 import MemoPetCore
 
+enum DrawingNoteTool {
+  case inactive
+  case draw
+  case erase
+}
+
 final class DrawingNoteView: NSView {
   var onChange: (([MemoStroke]) -> Void)?
   var onCoordinateMigration: (([MemoStroke]) -> Void)?
   var onEscape: (() -> Void)?
 
-  var isDrawingEnabled = false {
+  var activeTool: DrawingNoteTool = .inactive {
     didSet {
-      guard isDrawingEnabled != oldValue else { return }
-      setAccessibilityEnabled(isDrawingEnabled)
+      guard activeTool != oldValue else { return }
+      currentStroke = nil
+      resetEraserGesture()
+      setAccessibilityEnabled(activeTool != .inactive)
+      setAccessibilityLabel(
+        activeTool == .erase ? "Erase drawing" : "Drawing note"
+      )
       window?.invalidateCursorRects(for: self)
     }
   }
@@ -26,9 +37,27 @@ final class DrawingNoteView: NSView {
   override var acceptsFirstResponder: Bool { true }
 
   private var currentStroke: MemoStroke?
+  private var lastEraserPoint: MemoPoint?
+  private var eraserStartStrokes: [MemoStroke]?
+  private var eraserDidChange = false
+  private var undoHistory: [[MemoStroke]] = []
   private var cursorTrackingArea: NSTrackingArea?
   private let lineWidth: CGFloat = 2.75
   private let minimumPointDistance: CGFloat = 1.5
+  private let maximumUndoDepth = 20
+  private static let eraserRadius = 9.0
+  private static let eraserCursor = makeEraserCursor()
+
+  var cursorForActiveTool: NSCursor? {
+    switch activeTool {
+    case .inactive:
+      return nil
+    case .draw:
+      return .crosshair
+    case .erase:
+      return Self.eraserCursor
+    }
+  }
 
   override init(frame frameRect: NSRect) {
     super.init(frame: frameRect)
@@ -45,7 +74,7 @@ final class DrawingNoteView: NSView {
   }
 
   override func hitTest(_ point: NSPoint) -> NSView? {
-    isDrawingEnabled && bounds.contains(point) ? self : nil
+    activeTool != .inactive && bounds.contains(point) ? self : nil
   }
 
   override func draw(_ dirtyRect: NSRect) {
@@ -67,33 +96,68 @@ final class DrawingNoteView: NSView {
   }
 
   override func mouseDown(with event: NSEvent) {
-    guard isDrawingEnabled else { return }
+    guard activeTool != .inactive else { return }
+    cursorForActiveTool?.set()
     migrateLegacyCoordinatesIfPossible()
     window?.makeFirstResponder(self)
-    currentStroke = MemoStroke(
-      points: [drawingPoint(from: event)]
-    )
-    needsDisplay = true
+    let point = drawingPoint(from: event)
+
+    switch activeTool {
+    case .inactive:
+      break
+    case .draw:
+      currentStroke = MemoStroke(points: [point])
+      needsDisplay = true
+    case .erase:
+      lastEraserPoint = point
+      eraserStartStrokes = strokes
+      eraserDidChange = false
+      erase(from: point, to: point)
+    }
   }
 
   override func mouseDragged(with event: NSEvent) {
-    guard isDrawingEnabled else { return }
-    appendPoint(from: event)
+    guard activeTool != .inactive else { return }
+    cursorForActiveTool?.set()
+
+    switch activeTool {
+    case .inactive:
+      break
+    case .draw:
+      appendPoint(from: event)
+    case .erase:
+      let point = drawingPoint(from: event)
+      erase(from: lastEraserPoint ?? point, to: point)
+      lastEraserPoint = point
+    }
   }
 
   override func mouseUp(with event: NSEvent) {
-    guard isDrawingEnabled else { return }
-    appendPoint(from: event)
-
-    guard let currentStroke, !currentStroke.points.isEmpty else {
-      self.currentStroke = nil
+    switch activeTool {
+    case .inactive:
       return
-    }
+    case .draw:
+      appendPoint(from: event)
 
-    strokes.append(currentStroke)
-    self.currentStroke = nil
-    needsDisplay = true
-    onChange?(strokes)
+      guard let currentStroke, !currentStroke.points.isEmpty else {
+        self.currentStroke = nil
+        return
+      }
+
+      recordUndoState(strokes)
+      strokes.append(currentStroke)
+      self.currentStroke = nil
+      needsDisplay = true
+      onChange?(strokes)
+    case .erase:
+      let point = drawingPoint(from: event)
+      erase(from: lastEraserPoint ?? point, to: point)
+      if eraserDidChange, let eraserStartStrokes {
+        recordUndoState(eraserStartStrokes)
+        onChange?(strokes)
+      }
+      resetEraserGesture()
+    }
   }
 
   override func keyDown(with event: NSEvent) {
@@ -115,8 +179,8 @@ final class DrawingNoteView: NSView {
 
   override func resetCursorRects() {
     super.resetCursorRects()
-    if isDrawingEnabled {
-      addCursorRect(bounds, cursor: .crosshair)
+    if let cursorForActiveTool {
+      addCursorRect(bounds, cursor: cursorForActiveTool)
     }
   }
 
@@ -134,6 +198,7 @@ final class DrawingNoteView: NSView {
         .cursorUpdate,
         .inVisibleRect,
         .mouseEnteredAndExited,
+        .mouseMoved,
       ],
       owner: self,
       userInfo: nil
@@ -143,23 +208,31 @@ final class DrawingNoteView: NSView {
   }
 
   override func cursorUpdate(with event: NSEvent) {
-    if isDrawingEnabled {
-      NSCursor.crosshair.set()
+    if let cursorForActiveTool {
+      cursorForActiveTool.set()
     } else {
       super.cursorUpdate(with: event)
     }
   }
 
   override func mouseEntered(with event: NSEvent) {
-    if isDrawingEnabled {
-      NSCursor.crosshair.set()
+    if let cursorForActiveTool {
+      cursorForActiveTool.set()
     } else {
       super.mouseEntered(with: event)
     }
   }
 
+  override func mouseMoved(with event: NSEvent) {
+    if let cursorForActiveTool {
+      cursorForActiveTool.set()
+    } else {
+      super.mouseMoved(with: event)
+    }
+  }
+
   override func mouseExited(with event: NSEvent) {
-    if isDrawingEnabled {
+    if activeTool != .inactive {
       NSCursor.arrow.set()
     } else {
       super.mouseExited(with: event)
@@ -172,14 +245,8 @@ final class DrawingNoteView: NSView {
   }
 
   func undoLastStroke() {
-    guard !strokes.isEmpty else { return }
-    strokes.removeLast()
-    onChange?(strokes)
-  }
-
-  func clearDrawing() {
-    guard !strokes.isEmpty else { return }
-    strokes.removeAll()
+    guard let previousStrokes = undoHistory.popLast() else { return }
+    strokes = previousStrokes
     onChange?(strokes)
   }
 
@@ -189,6 +256,7 @@ final class DrawingNoteView: NSView {
   ) {
     self.coordinateSpace = coordinateSpace
     self.strokes = strokes
+    undoHistory.removeAll()
     migrateLegacyCoordinatesIfPossible()
   }
 
@@ -224,6 +292,31 @@ final class DrawingNoteView: NSView {
     currentStroke.points.append(point)
     self.currentStroke = currentStroke
     needsDisplay = true
+  }
+
+  private func erase(from start: MemoPoint, to end: MemoPoint) {
+    let erasedStrokes = MemoDrawingEraser.erasing(
+      strokes: strokes,
+      from: start,
+      to: end,
+      radius: Self.eraserRadius
+    )
+    guard erasedStrokes != strokes else { return }
+    strokes = erasedStrokes
+    eraserDidChange = true
+  }
+
+  private func resetEraserGesture() {
+    lastEraserPoint = nil
+    eraserStartStrokes = nil
+    eraserDidChange = false
+  }
+
+  private func recordUndoState(_ previousStrokes: [MemoStroke]) {
+    undoHistory.append(previousStrokes)
+    if undoHistory.count > maximumUndoDepth {
+      undoHistory.removeFirst(undoHistory.count - maximumUndoDepth)
+    }
   }
 
   private func drawingPoint(from event: NSEvent) -> MemoPoint {
@@ -277,6 +370,31 @@ final class DrawingNoteView: NSView {
     NSPoint(
       x: CGFloat(point.x),
       y: CGFloat(point.y)
+    )
+  }
+
+  private static func makeEraserCursor() -> NSCursor {
+    let padding: CGFloat = 2
+    let diameter = CGFloat(eraserRadius * 2)
+    let imageSize = NSSize(
+      width: diameter + (padding * 2),
+      height: diameter + (padding * 2)
+    )
+    let image = NSImage(size: imageSize, flipped: false) { rect in
+      let circle = NSBezierPath(
+        ovalIn: rect.insetBy(dx: padding, dy: padding)
+      )
+      NSColor.white.withAlphaComponent(0.95).setStroke()
+      circle.lineWidth = 3
+      circle.stroke()
+      NSColor.black.withAlphaComponent(0.9).setStroke()
+      circle.lineWidth = 1
+      circle.stroke()
+      return true
+    }
+    return NSCursor(
+      image: image,
+      hotSpot: NSPoint(x: imageSize.width / 2, y: imageSize.height / 2)
     )
   }
 }

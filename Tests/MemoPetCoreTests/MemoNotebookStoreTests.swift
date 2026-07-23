@@ -18,7 +18,10 @@ final class MemoNotebookStoreTests: XCTestCase {
   func testSaveAndLoadPreservesTextDrawingAndSelection() throws {
     let directory = try makeTemporaryDirectory()
     let store = try MemoNotebookStore(directoryURL: directory)
-    let text = MemoNote(text: "에이전트 결과 확인 🐈")
+    let text = MemoNote(
+      title: "오늘 할 일",
+      text: "에이전트 결과 확인 🐈"
+    )
     let hybrid = MemoNote(
       text: "Circle this",
       strokes: [
@@ -93,6 +96,7 @@ final class MemoNotebookStoreTests: XCTestCase {
     XCTAssertEqual(notebook.version, MemoNotebook.currentVersion)
     XCTAssertEqual(notebook.notes.map(\.id), [textID, drawingID])
     XCTAssertEqual(notebook.notes[0].text, "Keep me")
+    XCTAssertNil(notebook.notes[0].title)
     XCTAssertEqual(notebook.notes[1].strokes.count, 1)
     XCTAssertNil(notebook.notes[1].drawingCoordinateSpace)
     XCTAssertEqual(notebook.selectedNoteID, drawingID)

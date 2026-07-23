@@ -164,9 +164,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     statusMenuController?.onSetCharacterSize = { [weak self] size in
       self?.setCharacterSize(size)
     }
-    statusMenuController?.onDeleteCurrentNote = { [weak self] in
-      self?.scratchpadController?.deleteSelectedNote()
-    }
     statusMenuController?.onOpenDataFolder = { [weak self] in
       self?.openDataFolder()
     }
