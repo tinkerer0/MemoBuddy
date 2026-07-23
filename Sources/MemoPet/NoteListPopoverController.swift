@@ -15,6 +15,7 @@ final class NoteListPopoverController: NSViewController {
   private let scrollView = NSScrollView(frame: .zero)
   private let rowsView = FlippedRowsView(frame: .zero)
   private var rowViews: [NoteListRowView] = []
+  private var displayedNoteIDs: [UUID] = []
   private var displayedNoteCount = 1
   private var pendingDeleteIndex: Int?
 
@@ -72,7 +73,20 @@ final class NoteListPopoverController: NSViewController {
 
   func display(notes: [MemoNote], selectedIndex: Int) {
     _ = view
+    let noteIDs = notes.map(\.id)
+    if noteIDs == displayedNoteIDs,
+      rowViews.count == notes.count
+    {
+      dismissDeleteConfirmation()
+      for (index, row) in rowViews.enumerated() {
+        row.setSelected(index == selectedIndex)
+      }
+      return
+    }
+
+    finishTitleEditing()
     pendingDeleteIndex = nil
+    displayedNoteIDs = noteIDs
     displayedNoteCount = notes.count
     rowViews.forEach { $0.removeFromSuperview() }
     rowViews = notes.enumerated().map { index, note in
@@ -84,13 +98,14 @@ final class NoteListPopoverController: NSViewController {
         canDelete: notes.count > 1 || !note.isEmpty,
         clearsOnlyNote: notes.count == 1
       )
-      row.onSelect = { [weak self] index in
+      row.onActivate = { [weak self] index in
         self?.onSelectNote?(index)
       }
       row.onRename = { [weak self] index, title in
         self?.onRenameNote?(index, title)
       }
       row.onDelete = { [weak self] index in
+        self?.finishTitleEditing()
         self?.requestDelete(at: index)
       }
       row.onCancelDelete = { [weak self] in
@@ -121,6 +136,10 @@ final class NoteListPopoverController: NSViewController {
     for (rowIndex, row) in rowViews.enumerated() {
       row.setDeleteConfirmationVisible(rowIndex == index)
     }
+  }
+
+  private func finishTitleEditing() {
+    view.window?.makeFirstResponder(nil)
   }
 
   private func confirmDelete(at index: Int) {
@@ -207,21 +226,20 @@ private final class NoteListRowView:
 {
   static let height: CGFloat = 36
 
-  var onSelect: ((Int) -> Void)?
+  var onActivate: ((Int) -> Void)?
   var onRename: ((Int, String) -> Void)?
   var onDelete: ((Int) -> Void)?
   var onCancelDelete: (() -> Void)?
   var onConfirmDelete: ((Int) -> Void)?
 
   private let index: Int
-  private let isSelected: Bool
+  private var isSelected: Bool
   private let canDelete: Bool
-  private let titleField = NSTextField(frame: .zero)
+  private let titleField = NoteTitleField(frame: .zero)
   private let deleteButton = NSButton(frame: .zero)
   private let cancelDeleteButton = NSButton(frame: .zero)
   private let confirmDeleteButton = NSButton(frame: .zero)
   private var isShowingDeleteConfirmation = false
-  private var isEditingTitle = false
 
   init(
     index: Int,
@@ -245,15 +263,19 @@ private final class NoteListRowView:
     titleField.font = .systemFont(ofSize: 12)
     titleField.lineBreakMode = .byTruncatingTail
     titleField.usesSingleLineMode = true
-    titleField.isEditable = false
-    titleField.isSelectable = false
+    titleField.isEditable = true
+    titleField.isSelectable = true
     titleField.isBordered = false
     titleField.drawsBackground = false
     titleField.focusRingType = .none
-    titleField.toolTip = "Click to open; right-click or double-click to rename"
+    titleField.toolTip = "Click to select and edit the title"
     toolTip = titleField.toolTip
     titleField.delegate = self
     titleField.setAccessibilityLabel("Note \(index + 1) title")
+    titleField.onActivateRequested = { [weak self] in
+      guard let self, !self.isShowingDeleteConfirmation else { return }
+      self.onActivate?(self.index)
+    }
 
     deleteButton.image = NSImage(
       systemSymbolName: "trash",
@@ -334,44 +356,25 @@ private final class NoteListRowView:
     )
   }
 
-  override func hitTest(_ point: NSPoint) -> NSView? {
-    let hitView = super.hitTest(point)
-    if hitView === deleteButton
-      || hitView === cancelDeleteButton
-      || hitView === confirmDeleteButton
-      || isEditingTitle
-    {
-      return hitView
-    }
-    return bounds.contains(point) ? self : nil
+  override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
+    true
   }
 
   override func mouseDown(with event: NSEvent) {
     guard !isShowingDeleteConfirmation else { return }
-    let point = convert(event.locationInWindow, from: nil)
-    if event.clickCount >= 2, titleField.frame.contains(point) {
-      beginTitleEditing()
-      return
-    }
-    onSelect?(index)
-  }
-
-  override func rightMouseDown(with event: NSEvent) {
-    guard !isShowingDeleteConfirmation else { return }
-    let point = convert(event.locationInWindow, from: nil)
-    if titleField.frame.contains(point) {
-      beginTitleEditing()
-      return
-    }
-    super.rightMouseDown(with: event)
+    onActivate?(index)
+    window?.makeKey()
+    window?.makeFirstResponder(titleField)
+    titleField.selectText(nil)
   }
 
   func setDeleteConfirmationVisible(_ isVisible: Bool) {
-    if isVisible, isEditingTitle {
+    if isVisible {
       window?.makeFirstResponder(nil)
-      finishTitleEditing()
     }
     isShowingDeleteConfirmation = isVisible
+    titleField.isEditable = !isVisible
+    titleField.isSelectable = !isVisible
     deleteButton.isHidden = isVisible || !canDelete
     cancelDeleteButton.isHidden = !isVisible
     confirmDeleteButton.isHidden = !isVisible
@@ -379,12 +382,13 @@ private final class NoteListRowView:
     needsLayout = true
   }
 
-  func controlTextDidChange(_ notification: Notification) {
-    onRename?(index, titleField.stringValue)
+  func setSelected(_ isSelected: Bool) {
+    self.isSelected = isSelected
+    updateBackgroundColor()
   }
 
-  func controlTextDidEndEditing(_ notification: Notification) {
-    finishTitleEditing()
+  func controlTextDidChange(_ notification: Notification) {
+    onRename?(index, titleField.stringValue)
   }
 
   func control(
@@ -411,28 +415,6 @@ private final class NoteListRowView:
 
   @objc private func confirmDelete() {
     onConfirmDelete?(index)
-  }
-
-  private func beginTitleEditing() {
-    guard !isEditingTitle else { return }
-    isEditingTitle = true
-    titleField.isEditable = true
-    titleField.isSelectable = true
-    titleField.isBordered = true
-    titleField.drawsBackground = true
-    titleField.focusRingType = .default
-    window?.makeFirstResponder(titleField)
-    titleField.selectText(nil)
-  }
-
-  private func finishTitleEditing() {
-    guard isEditingTitle else { return }
-    isEditingTitle = false
-    titleField.isEditable = false
-    titleField.isSelectable = false
-    titleField.isBordered = false
-    titleField.drawsBackground = false
-    titleField.focusRingType = .none
   }
 
   private func configureConfirmationButton(
@@ -463,5 +445,19 @@ private final class NoteListRowView:
     } else {
       NSColor.clear.cgColor
     }
+  }
+}
+
+private final class NoteTitleField: NSTextField {
+  var onActivateRequested: (() -> Void)?
+
+  override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
+    true
+  }
+
+  override func mouseDown(with event: NSEvent) {
+    onActivateRequested?()
+    window?.makeKey()
+    super.mouseDown(with: event)
   }
 }

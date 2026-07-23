@@ -221,7 +221,7 @@ final class ScratchpadPanelController:
   private func addNote() {
     commitVisibleEditor()
     notebook.addNote()
-    displaySelectedNote(focusEditor: true)
+    displaySelectedNote(focusEditor: !isPresentingNoteList)
     saveNotebook()
   }
 

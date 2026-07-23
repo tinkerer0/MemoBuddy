@@ -176,7 +176,6 @@ final class BubbleBackgroundView: NSView, NSPopoverDelegate {
     }
     noteListController.onAddNote = { [weak self] in
       self?.onAddNote?()
-      self?.noteListPopover.performClose(nil)
     }
 
     errorLabel.font = .systemFont(ofSize: 11, weight: .medium)
@@ -231,9 +230,23 @@ final class BubbleBackgroundView: NSView, NSPopoverDelegate {
     )
 
     noteListButton.frame = NSRect(x: 0, y: 1, width: 24, height: 24)
-    previousNoteButton.frame = NSRect(x: 32, y: 1, width: 20, height: 24)
-    noteCountLabel.frame = NSRect(x: 56, y: 4, width: 50, height: 18)
-    nextNoteButton.frame = NSRect(x: 110, y: 1, width: 20, height: 24)
+    let noteCountWidth = max(
+      28,
+      ceil(noteCountLabel.intrinsicContentSize.width) + 4
+    )
+    previousNoteButton.frame = NSRect(x: 32, y: 1, width: 24, height: 24)
+    noteCountLabel.frame = NSRect(
+      x: previousNoteButton.frame.maxX,
+      y: 4,
+      width: noteCountWidth,
+      height: 18
+    )
+    nextNoteButton.frame = NSRect(
+      x: noteCountLabel.frame.maxX,
+      y: 1,
+      width: 24,
+      height: 24
+    )
     eraserButton.frame = NSRect(
       x: toolbarView.bounds.maxX - 24,
       y: 1,
@@ -298,6 +311,7 @@ final class BubbleBackgroundView: NSView, NSPopoverDelegate {
     selectedNoteIndex = index
     notesForList = notes
     noteCountLabel.stringValue = "\(index + 1)/\(total)"
+    needsLayout = true
     previousNoteButton.isEnabled = index > 0
     nextNoteButton.isEnabled = index + 1 < total
     noteCountLabel.setAccessibilityLabel(
