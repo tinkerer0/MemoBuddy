@@ -15,6 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   private var selectedCharacter: CharacterChoice = .memoWriter
   private var customCharacterAsset: CharacterAsset?
   private var isCheckingForUpdates = false
+  private var automaticUpdateCheckTimer: Timer?
 
   func applicationDidFinishLaunching(_ notification: Notification) {
     do {
@@ -42,6 +43,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   }
 
   private func configureApplication() throws {
+    configureMainMenu()
+
     let applicationSupportURL = try AppDirectories.applicationSupportURL()
     let characterStore = try CharacterStore(directoryURL: applicationSupportURL)
     let scratchpadStore = try MemoNotebookStore(directoryURL: applicationSupportURL)
@@ -122,6 +125,98 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       }
     }
     checkForUpdatesAutomaticallyIfNeeded()
+    startAutomaticUpdateChecks()
+  }
+
+  private func configureMainMenu() {
+    let mainMenu = NSMenu()
+
+    let appMenuItem = NSMenuItem(
+      title: "MemoPet",
+      action: nil,
+      keyEquivalent: ""
+    )
+    let appMenu = NSMenu(title: "MemoPet")
+    appMenu.addItem(
+      NSMenuItem(
+        title: "Quit MemoPet",
+        action: #selector(NSApplication.terminate(_:)),
+        keyEquivalent: "q"
+      )
+    )
+    appMenuItem.submenu = appMenu
+    mainMenu.addItem(appMenuItem)
+
+    let editMenuItem = NSMenuItem(
+      title: "Edit",
+      action: nil,
+      keyEquivalent: ""
+    )
+    let editMenu = NSMenu(title: "Edit")
+    editMenu.addItem(
+      responderMenuItem(
+        title: "Undo",
+        action: Selector(("undo:")),
+        key: "z"
+      )
+    )
+    editMenu.addItem(
+      responderMenuItem(
+        title: "Redo",
+        action: Selector(("redo:")),
+        key: "z",
+        modifiers: [.command, .shift]
+      )
+    )
+    editMenu.addItem(.separator())
+    editMenu.addItem(
+      responderMenuItem(
+        title: "Cut",
+        action: #selector(NSText.cut(_:)),
+        key: "x"
+      )
+    )
+    editMenu.addItem(
+      responderMenuItem(
+        title: "Copy",
+        action: #selector(NSText.copy(_:)),
+        key: "c"
+      )
+    )
+    editMenu.addItem(
+      responderMenuItem(
+        title: "Paste",
+        action: #selector(NSText.paste(_:)),
+        key: "v"
+      )
+    )
+    editMenu.addItem(.separator())
+    editMenu.addItem(
+      responderMenuItem(
+        title: "Select All",
+        action: #selector(NSText.selectAll(_:)),
+        key: "a"
+      )
+    )
+    editMenuItem.submenu = editMenu
+    mainMenu.addItem(editMenuItem)
+
+    NSApp.mainMenu = mainMenu
+  }
+
+  private func responderMenuItem(
+    title: String,
+    action: Selector,
+    key: String,
+    modifiers: NSEvent.ModifierFlags = .command
+  ) -> NSMenuItem {
+    let item = NSMenuItem(
+      title: title,
+      action: action,
+      keyEquivalent: key
+    )
+    item.keyEquivalentModifierMask = modifiers
+    return item
   }
 
   private func configureCharacterCallbacks() {
@@ -378,6 +473,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       lastCheck: settings.lastUpdateCheckDate
     ) else { return }
     checkForUpdates(manual: false)
+  }
+
+  private func startAutomaticUpdateChecks() {
+    automaticUpdateCheckTimer?.invalidate()
+    let timer = Timer(
+      timeInterval: 60 * 60,
+      target: self,
+      selector: #selector(automaticUpdateCheckTimerFired),
+      userInfo: nil,
+      repeats: true
+    )
+    RunLoop.main.add(timer, forMode: .common)
+    automaticUpdateCheckTimer = timer
+  }
+
+  @objc private func automaticUpdateCheckTimerFired() {
+    checkForUpdatesAutomaticallyIfNeeded()
   }
 
   private func checkForUpdates(manual: Bool) {

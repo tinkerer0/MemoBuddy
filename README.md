@@ -22,7 +22,7 @@ It was built to remove a small interruption from AI-assisted work: opening a sep
 - Animated GIF, PNG, JPEG, and WebP character support
 - Three bundled characters: Classic, Memo Writer, and Orbiting Planet
 - Drag to move; an open memo follows the character in real time
-- Right-click to choose Small, Medium, or Large
+- Right-click to change the character or size, or quit MemoPet
 - Floats above apps and follows you across macOS Spaces
 - Menu bar controls for recovery and less-common actions
 - Lightweight update notices when a newer GitHub Release is published
@@ -76,9 +76,10 @@ Create the clean Universal release archive with:
 | Open or close memo | Click the character |
 | Open the notes list | Click the list and note count at the top left |
 | Add a blank note | Click `+` in the notes list |
-| Title a note | Right-click or double-click its title in the memo list |
+| Select and title a note | Click its title in the memo list, then type |
 | Draw on the current note | Toggle the pencil in the memo |
 | Move between notes | Use the arrows beside the note count or select one from the memo list |
+| Cut, copy, paste, or select text | Press <kbd>⌘X</kbd>, <kbd>⌘C</kbd>, <kbd>⌘V</kbd>, or <kbd>⌘A</kbd> |
 | Undo text or a drawing action | Press <kbd>⌘Z</kbd> in its editing mode |
 | Redo text | Press <kbd>⇧⌘Z</kbd> in text mode |
 | Erase part of a drawing | Toggle the eraser, then drag over the drawing |
@@ -86,7 +87,7 @@ Create the clean Universal release archive with:
 | Close memo | Click elsewhere or press Escape |
 | Move character | Drag the character |
 | Resize memo | Drag any memo edge or corner |
-| Change character or size | Right-click the character |
+| Change character, size, or quit | Right-click the character |
 | Updates, recovery, and extra actions | Use the menu bar icon |
 
 Notes and custom characters are stored locally in:
@@ -105,7 +106,7 @@ The bundled mascot is part of this repository. You are responsible for the right
 
 MemoPet stores notes, custom characters, and preferences locally. The data directory is restricted to your macOS user, but its contents are not encrypted; software running as the same user can still read them. MemoPet has no account, analytics, advertising, or telemetry.
 
-To check for updates, the packaged app makes one small request to GitHub's public latest-release API at most once every 24 hours, plus any checks you start from **Menu Bar → More → Check for Updates…**. Normal network metadata such as your IP address is therefore visible to GitHub. Memo contents and custom character files are never included.
+To check for updates, the packaged app checks while it is running and makes one small request to GitHub's public latest-release API at most once every 24 hours, plus any checks you start from **Menu Bar → More → Check for Updates…**. Normal network metadata such as your IP address is therefore visible to GitHub. Memo contents and custom character files are never included.
 
 An update notice appears only after this repository publishes a newer numbered GitHub Release; pushing a commit alone does not trigger one. MemoPet opens the release page after you choose **View Release** and never downloads or installs an update by itself.
 

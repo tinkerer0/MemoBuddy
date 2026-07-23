@@ -85,6 +85,14 @@ final class StatusMenuController: NSObject {
     let sizeItem = NSMenuItem(title: "Character Size", action: nil, keyEquivalent: "")
     sizeItem.submenu = makeSizeMenu(selectedSize: state.characterSize)
     menu.addItem(sizeItem)
+    menu.addItem(.separator())
+    menu.addItem(
+      actionItem(
+        title: "Quit MemoPet",
+        action: #selector(quit),
+        key: "q"
+      )
+    )
     return menu
   }
 

@@ -6,6 +6,8 @@
   <string>en</string>
   <key>CFBundleExecutable</key>
   <string>MemoPet</string>
+  <key>CFBundleIconFile</key>
+  <string>AppIcon.icns</string>
   <key>CFBundleIdentifier</key>
   <string>app.memopet.MemoPet</string>
   <key>CFBundleInfoDictionaryVersion</key>
