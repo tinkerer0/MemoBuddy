@@ -18,24 +18,58 @@ public struct MemoStroke: Codable, Equatable {
   }
 }
 
+public enum MemoDrawingCoordinateSpace: String, Codable, Equatable {
+  case absolutePoints
+}
+
+public enum MemoDrawingCoordinates {
+  public static func convertingLegacyNormalizedStrokes(
+    _ strokes: [MemoStroke],
+    canvasWidth: Double,
+    canvasHeight: Double
+  ) -> [MemoStroke] {
+    guard canvasWidth.isFinite,
+      canvasHeight.isFinite,
+      canvasWidth > 0,
+      canvasHeight > 0
+    else {
+      return strokes
+    }
+
+    return strokes.map { stroke in
+      MemoStroke(
+        points: stroke.points.map { point in
+          MemoPoint(
+            x: point.x * canvasWidth,
+            y: point.y * canvasHeight
+          )
+        }
+      )
+    }
+  }
+}
+
 public struct MemoNote: Codable, Equatable, Identifiable {
   public var id: UUID
   public var text: String
   public var strokes: [MemoStroke]
+  public var drawingCoordinateSpace: MemoDrawingCoordinateSpace?
 
   public init(
     id: UUID = UUID(),
     text: String = "",
-    strokes: [MemoStroke] = []
+    strokes: [MemoStroke] = [],
+    drawingCoordinateSpace: MemoDrawingCoordinateSpace? = .absolutePoints
   ) {
     self.id = id
     self.text = text
     self.strokes = strokes
+    self.drawingCoordinateSpace = drawingCoordinateSpace
   }
 }
 
 public struct MemoNotebook: Codable, Equatable {
-  public static let currentVersion = 2
+  public static let currentVersion = 3
 
   public var version: Int
   public var notes: [MemoNote]
@@ -82,22 +116,22 @@ public struct MemoNotebook: Codable, Equatable {
       seenIDs.insert(notes[noteIndex].id)
 
       if sanitizeContent {
+        let coordinateMaximum: Double? =
+          notes[noteIndex].drawingCoordinateSpace == nil ? 1 : nil
         for strokeIndex in notes[noteIndex].strokes.indices {
           for pointIndex in notes[noteIndex].strokes[strokeIndex].points.indices {
-            notes[noteIndex].strokes[strokeIndex].points[pointIndex].x = min(
-              max(
-                notes[noteIndex].strokes[strokeIndex].points[pointIndex].x,
-                0
-              ),
-              1
+            let x = max(
+              notes[noteIndex].strokes[strokeIndex].points[pointIndex].x,
+              0
             )
-            notes[noteIndex].strokes[strokeIndex].points[pointIndex].y = min(
-              max(
-                notes[noteIndex].strokes[strokeIndex].points[pointIndex].y,
-                0
-              ),
-              1
+            let y = max(
+              notes[noteIndex].strokes[strokeIndex].points[pointIndex].y,
+              0
             )
+            notes[noteIndex].strokes[strokeIndex].points[pointIndex].x =
+              coordinateMaximum.map { min(x, $0) } ?? x
+            notes[noteIndex].strokes[strokeIndex].points[pointIndex].y =
+              coordinateMaximum.map { min(y, $0) } ?? y
           }
         }
       }

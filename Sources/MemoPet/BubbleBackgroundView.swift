@@ -20,7 +20,7 @@ final class BubbleBackgroundView: NSView {
   var onPreviousNote: (() -> Void)?
   var onNextNote: (() -> Void)?
   var onAddNote: (() -> Void)?
-  var onDeleteNote: (() -> Void)?
+  var onClose: (() -> Void)?
 
   var tailSide: BubbleTailSide = .left {
     didSet {
@@ -56,9 +56,13 @@ final class BubbleBackgroundView: NSView {
     symbolName: "pencil.tip",
     accessibilityLabel: "Draw on note"
   )
-  private let moreButton = BubbleBackgroundView.makeToolbarButton(
-    symbolName: "ellipsis",
-    accessibilityLabel: "More note actions"
+  private let clearDrawingButton = BubbleBackgroundView.makeToolbarButton(
+    symbolName: "eraser",
+    accessibilityLabel: "Clear drawing"
+  )
+  private let closeButton = BubbleBackgroundView.makeToolbarButton(
+    symbolName: "xmark",
+    accessibilityLabel: "Close memo"
   )
   private let tailWidth: CGFloat = 18
   private let tailHalfHeight: CGFloat = 14
@@ -120,8 +124,10 @@ final class BubbleBackgroundView: NSView {
     addButton.action = #selector(addNote)
     drawingButton.target = self
     drawingButton.action = #selector(toggleDrawingMode)
-    moreButton.target = self
-    moreButton.action = #selector(showMoreMenu)
+    clearDrawingButton.target = self
+    clearDrawingButton.action = #selector(clearDrawing)
+    closeButton.target = self
+    closeButton.action = #selector(closeMemo)
 
     errorLabel.font = .systemFont(ofSize: 11, weight: .medium)
     errorLabel.textColor = .systemRed
@@ -131,9 +137,10 @@ final class BubbleBackgroundView: NSView {
     toolbarView.addSubview(previousButton)
     toolbarView.addSubview(noteCountLabel)
     toolbarView.addSubview(nextButton)
-    toolbarView.addSubview(drawingButton)
     toolbarView.addSubview(addButton)
-    toolbarView.addSubview(moreButton)
+    toolbarView.addSubview(drawingButton)
+    toolbarView.addSubview(clearDrawingButton)
+    toolbarView.addSubview(closeButton)
 
     addSubview(scrollView)
     addSubview(toolbarSeparator)
@@ -177,20 +184,26 @@ final class BubbleBackgroundView: NSView {
     previousButton.frame = NSRect(x: 0, y: 1, width: 24, height: 24)
     noteCountLabel.frame = NSRect(x: 25, y: 4, width: 48, height: 18)
     nextButton.frame = NSRect(x: 74, y: 1, width: 24, height: 24)
-    moreButton.frame = NSRect(
+    closeButton.frame = NSRect(
       x: toolbarView.bounds.maxX - 24,
       y: 1,
       width: 24,
       height: 24
     )
-    addButton.frame = NSRect(
-      x: moreButton.frame.minX - 28,
+    clearDrawingButton.frame = NSRect(
+      x: closeButton.frame.minX - 28,
       y: 1,
       width: 24,
       height: 24
     )
     drawingButton.frame = NSRect(
-      x: addButton.frame.minX - 28,
+      x: clearDrawingButton.frame.minX - 28,
+      y: 1,
+      width: 24,
+      height: 24
+    )
+    addButton.frame = NSRect(
+      x: drawingButton.frame.minX - 28,
       y: 1,
       width: 24,
       height: 24
@@ -204,6 +217,7 @@ final class BubbleBackgroundView: NSView {
     )
     scrollView.frame = editorFrame
     drawingView.frame = textView.bounds
+    drawingView.migrateLegacyCoordinatesIfPossible()
   }
 
   override func draw(_ dirtyRect: NSRect) {
@@ -238,11 +252,18 @@ final class BubbleBackgroundView: NSView {
     setDrawingMode(false, focusEditor: false)
     textView.string = note.text
     textView.undoManager?.removeAllActions()
-    drawingView.strokes = note.strokes
+    drawingView.display(
+      strokes: note.strokes,
+      coordinateSpace: note.drawingCoordinateSpace
+    )
 
     noteCountLabel.stringValue = "\(index + 1) / \(total)"
     previousButton.isEnabled = index > 0
     nextButton.isEnabled = index + 1 < total
+    let showsNavigation = total > 1
+    previousButton.isHidden = !showsNavigation
+    noteCountLabel.isHidden = !showsNavigation
+    nextButton.isHidden = !showsNavigation
     showError(nil)
   }
 
@@ -265,6 +286,10 @@ final class BubbleBackgroundView: NSView {
     drawingView.strokes
   }
 
+  var currentDrawingCoordinateSpace: MemoDrawingCoordinateSpace? {
+    drawingView.coordinateSpace
+  }
+
   @objc private func showPreviousNote() {
     onPreviousNote?()
   }
@@ -273,62 +298,12 @@ final class BubbleBackgroundView: NSView {
     onNextNote?()
   }
 
-  @objc private func showMoreMenu() {
-    let menu = NSMenu()
-    menu.autoenablesItems = false
-
-    let undoItem = NSMenuItem(
-      title: "Undo Last Stroke",
-      action: #selector(undoLastStroke),
-      keyEquivalent: ""
-    )
-    undoItem.target = self
-    undoItem.isEnabled = !drawingView.strokes.isEmpty
-    undoItem.image = NSImage(
-      systemSymbolName: "arrow.uturn.backward",
-      accessibilityDescription: nil
-    )
-    menu.addItem(undoItem)
-
-    let clearItem = NSMenuItem(
-      title: "Clear Drawing",
-      action: #selector(clearDrawing),
-      keyEquivalent: ""
-    )
-    clearItem.target = self
-    clearItem.isEnabled = !drawingView.strokes.isEmpty
-    clearItem.image = NSImage(
-      systemSymbolName: "eraser",
-      accessibilityDescription: nil
-    )
-    menu.addItem(clearItem)
-    menu.addItem(.separator())
-
-    let deleteItem = NSMenuItem(
-      title: "Delete Note",
-      action: #selector(deleteNote),
-      keyEquivalent: ""
-    )
-    deleteItem.target = self
-    deleteItem.image = NSImage(
-      systemSymbolName: "trash",
-      accessibilityDescription: nil
-    )
-    menu.addItem(deleteItem)
-
-    popUp(menu, from: moreButton)
-  }
-
   @objc private func addNote() {
     onAddNote?()
   }
 
   @objc private func toggleDrawingMode() {
     setDrawingMode(!isDrawingMode, focusEditor: true)
-  }
-
-  @objc private func undoLastStroke() {
-    drawingView.undoLastStroke()
   }
 
   @objc private func clearDrawing() {
@@ -344,8 +319,8 @@ final class BubbleBackgroundView: NSView {
     drawingView.clearDrawing()
   }
 
-  @objc private func deleteNote() {
-    onDeleteNote?()
+  @objc private func closeMemo() {
+    onClose?()
   }
 
   private func setDrawingMode(_ enabled: Bool, focusEditor: Bool) {
@@ -363,14 +338,6 @@ final class BubbleBackgroundView: NSView {
     if focusEditor, let window {
       focusActiveEditor(in: window)
     }
-  }
-
-  private func popUp(_ menu: NSMenu, from button: NSButton) {
-    menu.popUp(
-      positioning: nil,
-      at: NSPoint(x: button.bounds.minX, y: button.bounds.minY - 4),
-      in: button
-    )
   }
 
   private static func makeToolbarButton(

@@ -16,6 +16,7 @@ final class StatusMenuController: NSObject {
   var onCenterCharacter: (() -> Void)?
   var onToggleCharacter: (() -> Void)?
   var onSetCharacterSize: ((CGFloat) -> Void)?
+  var onDeleteCurrentNote: (() -> Void)?
   var onOpenDataFolder: (() -> Void)?
   var onCheckForUpdates: (() -> Void)?
   var onQuit: (() -> Void)?
@@ -155,6 +156,12 @@ final class StatusMenuController: NSObject {
     )
     menu.addItem(.separator())
     menu.addItem(
+      actionItem(
+        title: "Delete Current Note…",
+        action: #selector(deleteCurrentNote)
+      )
+    )
+    menu.addItem(
       actionItem(title: "Open Data Folder", action: #selector(openDataFolder))
     )
     menu.addItem(.separator())
@@ -184,6 +191,7 @@ final class StatusMenuController: NSObject {
     guard let value = sender.representedObject as? Double else { return }
     onSetCharacterSize?(CGFloat(value))
   }
+  @objc private func deleteCurrentNote() { onDeleteCurrentNote?() }
   @objc private func openDataFolder() { onOpenDataFolder?() }
   @objc private func checkForUpdates() { onCheckForUpdates?() }
   @objc private func quit() { onQuit?() }

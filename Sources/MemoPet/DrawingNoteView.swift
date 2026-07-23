@@ -3,6 +3,7 @@ import MemoPetCore
 
 final class DrawingNoteView: NSView {
   var onChange: (([MemoStroke]) -> Void)?
+  var onCoordinateMigration: (([MemoStroke]) -> Void)?
   var onEscape: (() -> Void)?
 
   var isDrawingEnabled = false {
@@ -19,10 +20,13 @@ final class DrawingNoteView: NSView {
     }
   }
 
+  private(set) var coordinateSpace: MemoDrawingCoordinateSpace? = .absolutePoints
+
   override var isFlipped: Bool { true }
   override var acceptsFirstResponder: Bool { true }
 
   private var currentStroke: MemoStroke?
+  private var cursorTrackingArea: NSTrackingArea?
   private let lineWidth: CGFloat = 2.75
   private let minimumPointDistance: CGFloat = 1.5
 
@@ -64,9 +68,10 @@ final class DrawingNoteView: NSView {
 
   override func mouseDown(with event: NSEvent) {
     guard isDrawingEnabled else { return }
+    migrateLegacyCoordinatesIfPossible()
     window?.makeFirstResponder(self)
     currentStroke = MemoStroke(
-      points: [normalizedPoint(from: event)]
+      points: [drawingPoint(from: event)]
     )
     needsDisplay = true
   }
@@ -115,6 +120,52 @@ final class DrawingNoteView: NSView {
     }
   }
 
+  override func updateTrackingAreas() {
+    super.updateTrackingAreas()
+
+    if let cursorTrackingArea {
+      removeTrackingArea(cursorTrackingArea)
+    }
+
+    let trackingArea = NSTrackingArea(
+      rect: .zero,
+      options: [
+        .activeAlways,
+        .cursorUpdate,
+        .inVisibleRect,
+        .mouseEnteredAndExited,
+      ],
+      owner: self,
+      userInfo: nil
+    )
+    addTrackingArea(trackingArea)
+    cursorTrackingArea = trackingArea
+  }
+
+  override func cursorUpdate(with event: NSEvent) {
+    if isDrawingEnabled {
+      NSCursor.crosshair.set()
+    } else {
+      super.cursorUpdate(with: event)
+    }
+  }
+
+  override func mouseEntered(with event: NSEvent) {
+    if isDrawingEnabled {
+      NSCursor.crosshair.set()
+    } else {
+      super.mouseEntered(with: event)
+    }
+  }
+
+  override func mouseExited(with event: NSEvent) {
+    if isDrawingEnabled {
+      NSCursor.arrow.set()
+    } else {
+      super.mouseExited(with: event)
+    }
+  }
+
   override func viewDidChangeEffectiveAppearance() {
     super.viewDidChangeEffectiveAppearance()
     needsDisplay = true
@@ -132,10 +183,38 @@ final class DrawingNoteView: NSView {
     onChange?(strokes)
   }
 
+  func display(
+    strokes: [MemoStroke],
+    coordinateSpace: MemoDrawingCoordinateSpace?
+  ) {
+    self.coordinateSpace = coordinateSpace
+    self.strokes = strokes
+    migrateLegacyCoordinatesIfPossible()
+  }
+
+  func migrateLegacyCoordinatesIfPossible() {
+    guard coordinateSpace == nil,
+      bounds.width.isFinite,
+      bounds.height.isFinite,
+      bounds.width > 0,
+      bounds.height > 0
+    else {
+      return
+    }
+
+    strokes = MemoDrawingCoordinates.convertingLegacyNormalizedStrokes(
+      strokes,
+      canvasWidth: Double(bounds.width),
+      canvasHeight: Double(bounds.height)
+    )
+    coordinateSpace = .absolutePoints
+    onCoordinateMigration?(strokes)
+  }
+
   private func appendPoint(from event: NSEvent) {
     guard var currentStroke else { return }
 
-    let point = normalizedPoint(from: event)
+    let point = drawingPoint(from: event)
     if let previous = currentStroke.points.last,
       distance(from: previous, to: point) < minimumPointDistance
     {
@@ -147,14 +226,14 @@ final class DrawingNoteView: NSView {
     needsDisplay = true
   }
 
-  private func normalizedPoint(from event: NSEvent) -> MemoPoint {
+  private func drawingPoint(from event: NSEvent) -> MemoPoint {
     let point = convert(event.locationInWindow, from: nil)
-    let x = bounds.width > 0 ? point.x / bounds.width : 0
-    let y = bounds.height > 0 ? point.y / bounds.height : 0
+    let x = min(max(point.x, 0), bounds.width)
+    let y = min(max(point.y, 0), bounds.height)
 
     return MemoPoint(
-      x: quantized(min(max(x, 0), 1)),
-      y: quantized(min(max(y, 0), 1))
+      x: quantized(x),
+      y: quantized(y)
     )
   }
 
@@ -163,8 +242,8 @@ final class DrawingNoteView: NSView {
   }
 
   private func distance(from lhs: MemoPoint, to rhs: MemoPoint) -> CGFloat {
-    let dx = CGFloat(rhs.x - lhs.x) * bounds.width
-    let dy = CGFloat(rhs.y - lhs.y) * bounds.height
+    let dx = CGFloat(rhs.x - lhs.x)
+    let dy = CGFloat(rhs.y - lhs.y)
     return hypot(dx, dy)
   }
 
@@ -196,8 +275,8 @@ final class DrawingNoteView: NSView {
 
   private func canvasPoint(_ point: MemoPoint) -> NSPoint {
     NSPoint(
-      x: CGFloat(point.x) * bounds.width,
-      y: CGFloat(point.y) * bounds.height
+      x: CGFloat(point.x),
+      y: CGFloat(point.y)
     )
   }
 }

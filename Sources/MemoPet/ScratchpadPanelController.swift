@@ -26,6 +26,7 @@ final class ScratchpadPanelController:
   private var lastVisibleFrame: NSRect?
 
   var onSizeChanged: ((NSSize) -> Void)?
+  var onVisibilityChanged: ((Bool) -> Void)?
   private(set) var lastSaveError: Error?
 
   var isShowingScratchpad: Bool {
@@ -80,6 +81,9 @@ final class ScratchpadPanelController:
     bubbleView.drawingView.onChange = { [weak self] strokes in
       self?.drawingDidChange(strokes)
     }
+    bubbleView.drawingView.onCoordinateMigration = { [weak self] strokes in
+      self?.drawingCoordinatesDidMigrate(strokes)
+    }
     bubbleView.onPreviousNote = { [weak self] in
       self?.showPreviousNote()
     }
@@ -89,8 +93,8 @@ final class ScratchpadPanelController:
     bubbleView.onAddNote = { [weak self] in
       self?.addNote()
     }
-    bubbleView.onDeleteNote = { [weak self] in
-      self?.deleteSelectedNote()
+    bubbleView.onClose = { [weak self] in
+      self?.closeAndRestoreFocus()
     }
 
     displaySelectedNote(focusEditor: false)
@@ -124,12 +128,14 @@ final class ScratchpadPanelController:
     NSApp.activate(ignoringOtherApps: true)
     panel.makeKeyAndOrderFront(nil)
     bubbleView.focusActiveEditor(in: panel)
+    onVisibilityChanged?(true)
   }
 
   @discardableResult
   func closeAndRestoreFocus() -> Bool {
     guard flushSave() else { return false }
     window?.orderOut(nil)
+    onVisibilityChanged?(false)
 
     if let previousApplication, !previousApplication.isTerminated {
       previousApplication.activate(options: [.activateIgnoringOtherApps])
@@ -189,7 +195,17 @@ final class ScratchpadPanelController:
     guard !isDisplayingNote else { return }
     let index = notebook.selectedIndex
     notebook.notes[index].strokes = strokes
+    notebook.notes[index].drawingCoordinateSpace = .absolutePoints
     scheduleSave()
+  }
+
+  private func drawingCoordinatesDidMigrate(_ strokes: [MemoStroke]) {
+    let index = notebook.selectedIndex
+    notebook.notes[index].strokes = strokes
+    notebook.notes[index].drawingCoordinateSpace = .absolutePoints
+    if !isDisplayingNote {
+      scheduleSave()
+    }
   }
 
   private func showPreviousNote() {
@@ -220,7 +236,7 @@ final class ScratchpadPanelController:
     saveNotebook()
   }
 
-  private func deleteSelectedNote() {
+  func deleteSelectedNote() {
     commitVisibleEditor()
     let selectedNote = notebook.selectedNote
     if !selectedNote.text.isEmpty || !selectedNote.strokes.isEmpty {
@@ -252,6 +268,8 @@ final class ScratchpadPanelController:
     let index = notebook.selectedIndex
     notebook.notes[index].text = bubbleView.currentText
     notebook.notes[index].strokes = bubbleView.currentStrokes
+    notebook.notes[index].drawingCoordinateSpace =
+      bubbleView.currentDrawingCoordinateSpace
   }
 
   private func updateSelectedText(_ text: String) {

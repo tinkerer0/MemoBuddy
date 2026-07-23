@@ -94,6 +94,7 @@ final class MemoNotebookStoreTests: XCTestCase {
     XCTAssertEqual(notebook.notes.map(\.id), [textID, drawingID])
     XCTAssertEqual(notebook.notes[0].text, "Keep me")
     XCTAssertEqual(notebook.notes[1].strokes.count, 1)
+    XCTAssertNil(notebook.notes[1].drawingCoordinateSpace)
     XCTAssertEqual(notebook.selectedNoteID, drawingID)
   }
 

@@ -56,7 +56,7 @@ final class MemoNotebookTests: XCTestCase {
     XCTAssertTrue(notebook.selectedNote.strokes.isEmpty)
   }
 
-  func testNormalizeRepairsDuplicateIDsAndOutOfBoundsDrawingPoints() {
+  func testNormalizeRepairsDuplicateIDsAndNegativeAbsoluteDrawingPoints() {
     let duplicateID = UUID()
     var notebook = MemoNotebook(
       version: 1,
@@ -79,8 +79,91 @@ final class MemoNotebookTests: XCTestCase {
     notebook.normalize()
 
     XCTAssertEqual(Set(notebook.notes.map(\.id)).count, 2)
-    XCTAssertEqual(notebook.notes[1].strokes[0].points[0], MemoPoint(x: 0, y: 1))
+    XCTAssertEqual(notebook.notes[1].strokes[0].points[0], MemoPoint(x: 0, y: 30))
     XCTAssertEqual(notebook.version, MemoNotebook.currentVersion)
     XCTAssertEqual(notebook.selectedNoteID, duplicateID)
+  }
+
+  func testNormalizeClampsLegacyNormalizedDrawingPoints() {
+    var notebook = MemoNotebook(
+      version: 2,
+      notes: [
+        MemoNote(
+          strokes: [
+            MemoStroke(
+              points: [
+                MemoPoint(x: -20, y: 30)
+              ]
+            )
+          ],
+          drawingCoordinateSpace: nil
+        )
+      ]
+    )
+
+    notebook.normalize()
+
+    XCTAssertEqual(
+      notebook.selectedNote.strokes[0].points[0],
+      MemoPoint(x: 0, y: 1)
+    )
+    XCTAssertNil(notebook.selectedNote.drawingCoordinateSpace)
+  }
+
+  func testConvertingLegacyDrawingUsesCanvasSizeOnce() {
+    let legacy = [
+      MemoStroke(
+        points: [
+          MemoPoint(x: 0.25, y: 0.5),
+          MemoPoint(x: 1, y: 0),
+        ]
+      )
+    ]
+
+    let converted = MemoDrawingCoordinates.convertingLegacyNormalizedStrokes(
+      legacy,
+      canvasWidth: 320,
+      canvasHeight: 180
+    )
+
+    XCTAssertEqual(
+      converted,
+      [
+        MemoStroke(
+          points: [
+            MemoPoint(x: 80, y: 90),
+            MemoPoint(x: 320, y: 0),
+          ]
+        )
+      ]
+    )
+    XCTAssertEqual(legacy[0].points[0], MemoPoint(x: 0.25, y: 0.5))
+  }
+
+  func testNormalizePreservesAbsolutePointsOutsideCurrentCanvas() {
+    var notebook = MemoNotebook(
+      notes: [
+        MemoNote(
+          strokes: [
+            MemoStroke(
+              points: [
+                MemoPoint(x: 480, y: 310)
+              ]
+            )
+          ]
+        )
+      ]
+    )
+
+    notebook.normalize()
+
+    XCTAssertEqual(
+      notebook.selectedNote.strokes[0].points[0],
+      MemoPoint(x: 480, y: 310)
+    )
+    XCTAssertEqual(
+      notebook.selectedNote.drawingCoordinateSpace,
+      .absolutePoints
+    )
   }
 }

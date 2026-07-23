@@ -17,7 +17,7 @@ It was built to remove a small interruption from AI-assisted work: opening a sep
 - Add blank notes with one click and switch drawing mode with the pencil
 - Move between notes with compact previous and next controls
 - Automatic local saving, including Korean, emoji, line breaks, and drawings
-- Resize the memo from its edges; your preferred size is remembered
+- Resize the memo from its edges; its size is remembered and drawings keep their scale
 - Animated GIF, PNG, JPEG, and WebP character support
 - Three bundled characters: Classic, Memo Writer, and Orbiting Planet
 - Drag to move; an open memo follows the character in real time
@@ -76,12 +76,13 @@ Create the clean Universal release archive with:
 | Add a blank note | Click `+` in the memo |
 | Draw on the current note | Toggle the pencil in the memo |
 | Move between notes | Click the left or right arrow |
-| Undo a drawing stroke | Press <kbd>⌘Z</kbd> or use `…` |
-| Clear or delete a note | Use `…` |
+| Undo a drawing stroke | Press <kbd>⌘Z</kbd> |
+| Clear the current drawing | Click the eraser in the memo |
+| Delete the current note | Use **Menu Bar → More → Delete Current Note…** |
+| Close memo | Click `×` or press Escape |
 | Move character | Drag the character |
 | Resize memo | Drag any memo edge or corner |
 | Change character or size | Right-click the character |
-| Close memo | Press Escape |
 | Updates, recovery, and extra actions | Use the menu bar icon |
 
 Notes and custom characters are stored locally in:
