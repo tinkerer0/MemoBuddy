@@ -58,7 +58,7 @@
 1. **개인 개발자 등록(무료)**: <https://storedeveloper.microsoft.com> → 개인으로 등록 → 신분증·셀카 인증.
 2. **앱 이름 예약**: Partner Center → Apps and games → New product → MSIX or PWA app → `MemoPet`.
 3. **Product identity 값 3개 확인**: 앱 → Product management → Product identity의 `Package/Identity/Name`, `Package/Identity/Publisher`(`CN=...`), `Package/Properties/PublisherDisplayName`.
-4. **Windows 11 PC 준비**: MSIX 포장과 실제 창 동작 확인에 필요하다. 지금은 없으므로 다음 중 하나를 고른다.
+4. **Windows 11 PC 준비**: MSIX 포장과 실제 창 동작 확인에 필요하다. 먼저 시험만 할 때는 GitHub Actions의 최근 성공한 CI 실행에서 `MemoPet-windows-installer`(서명 없는 설치 파일, GitHub 로그인 필요, 90일 보관)를 받아 Windows PC에서 설치해 본다. SmartScreen이 막으면 "추가 정보 → 실행". 관리자 권한 없이 현재 사용자에게 설치된다. Windows PC는 다음 중 하나로 구한다.
    - 가족·지인의 Windows 11 PC를 잠시 빌린다.
    - 맥에 UTM과 Windows 11 Arm 평가판(무료 90일, 디스크 약 64GB)을 설치한다.
    - 유료 클라우드 Windows VM을 쓴다.

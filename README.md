@@ -16,6 +16,8 @@ Click the little character to open a memo. Type or draw, click elsewhere, and it
 
 Mac App Store and Microsoft Store versions are being prepared. Until they are out, build it from source (below).
 
+Windows testers: open the latest successful [CI run](https://github.com/tinkerer0/MemoPet/actions/workflows/ci.yml) and download the `MemoPet-windows-installer` artifact (GitHub sign-in required, kept for 90 days). It is not code-signed yet, so Windows SmartScreen asks first: choose **More info → Run anyway**. It installs for the current user without administrator rights.
+
 The original macOS-only Swift/AppKit MemoPet (v0.4.1 and earlier) stays in this repository's history: `git checkout v0.4.1`.
 
 ## How it is built
