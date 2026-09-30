@@ -21,6 +21,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             app::load_notebook,
             app::ui_info,
+            app::dismiss_tip,
             app::save_note,
             app::select_note,
             app::add_note,

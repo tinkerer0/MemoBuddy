@@ -65,6 +65,8 @@ let busy = false;
 let closing = false;
 let saveError = "";
 let notice = "";
+/** First-run tip (click / right-click), shown until dismissed. */
+let tip = false;
 let clockValue = Date.now() * 1000;
 const clock = () => ++clockValue;
 const timers = new Map<string, number>();
@@ -174,6 +176,14 @@ function paintStatus() {
     status.dataset.kind = "info";
     statusText.textContent = notice;
     statusAction.textContent = t("확인", "OK");
+  } else if (tip) {
+    status.hidden = false;
+    status.dataset.kind = "info";
+    statusText.textContent = t(
+      "캐릭터를 누르면 메모가 열리고, 다른 곳을 누르면 저장돼요. 캐릭터를 우클릭하면 캐릭터·크기·테마를 바꿀 수 있어요.",
+      "Click the pet to open your memo; click anywhere else to save and close. Right-click the pet to change its look, size and theme.",
+    );
+    statusAction.textContent = t("알겠어요", "Got it");
   } else {
     status.hidden = true;
   }
@@ -182,8 +192,16 @@ function paintStatus() {
 statusAction.onclick = async () => {
   if (saveError) {
     if (await flushAll()) setError("");
-  } else {
+  } else if (notice) {
     notice = "";
+    paintStatus();
+  } else if (tip) {
+    try {
+      await invoke("dismiss_tip");
+      tip = false;
+    } catch {
+      // Not saved: keep the tip so it can be dismissed again.
+    }
     paintStatus();
   }
 };
@@ -953,11 +971,14 @@ async function start() {
       await invoke("quit_cancelled");
     }
   });
+  let firstRun = false;
   try {
-    const info = await invoke<{ language: string; platform: string; theme: string }>("ui_info");
+    const info = await invoke<{ language: string; platform: string; theme: string; firstRun: boolean; showTip: boolean }>("ui_info");
     setLanguage(info.language);
     document.documentElement.dataset.platform = info.platform;
     if (!themeChanged) document.documentElement.dataset.theme = info.theme;
+    firstRun = info.firstRun;
+    tip = info.showTip;
   } catch {
     // Keep the browser language.
   }
@@ -966,6 +987,9 @@ async function start() {
   tabs.setAttribute("aria-label", t("메모 목록", "Notes"));
   setTool("none");
   await reload();
+  paintStatus();
+  // First launch: open the memo once by itself so the tip is seen right away.
+  if (firstRun) void invoke("open_memo");
 }
 
 void start();

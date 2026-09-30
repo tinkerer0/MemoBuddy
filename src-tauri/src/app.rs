@@ -35,6 +35,8 @@ pub struct AppState {
     notebook: Mutex<MemoNotebook>,
     generations: Mutex<HashMap<Uuid, u64>>,
     pub settings: Mutex<Settings>,
+    /// No settings file existed at launch: the memo opens once with the tip.
+    first_run: bool,
     recovery_notice: Mutex<Option<String>>,
     tray: Mutex<Option<TrayIcon>>,
     quit: Mutex<QuitState>,
@@ -85,6 +87,9 @@ pub struct UiInfo {
     language: &'static str,
     platform: &'static str,
     theme: Theme,
+    /// Open the memo once by itself so the tip is seen.
+    first_run: bool,
+    show_tip: bool,
 }
 
 #[derive(Clone, Serialize)]
@@ -147,6 +152,7 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         }
     };
     let notice = store.recovery_notice().map(str::to_owned);
+    let first_run = !Settings::path(&data_dir).exists();
     let settings = Settings::load(&data_dir);
 
     app.manage(AppState {
@@ -155,6 +161,7 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         notebook: Mutex::new(notebook),
         generations: Mutex::new(HashMap::new()),
         settings: Mutex::new(settings.clone()),
+        first_run,
         recovery_notice: Mutex::new(notice),
         tray: Mutex::new(None),
         quit: Mutex::new(QuitState::default()),
@@ -247,11 +254,24 @@ pub fn load_notebook(app: AppHandle) -> NotebookView {
 
 #[tauri::command]
 pub fn ui_info(app: AppHandle) -> UiInfo {
+    let state = state(&app);
+    let settings = state.settings.lock().unwrap();
     UiInfo {
         language: crate::i18n::code(),
         platform: if cfg!(target_os = "macos") { "macos" } else { "windows" },
-        theme: state(&app).settings.lock().unwrap().theme.unwrap_or(Theme::Light),
+        theme: settings.theme.unwrap_or(Theme::Light),
+        first_run: state.first_run,
+        show_tip: !settings.tip_seen,
     }
+}
+
+/// The memo page's first-run tip was dismissed; it does not come back.
+/// Fails (and the tip stays) when the setting could not be saved.
+#[tauri::command]
+pub fn dismiss_tip(app: AppHandle) -> Result<(), String> {
+    let state = state(&app);
+    let result = state.settings.lock().unwrap().dismiss_tip(&state.data_dir);
+    result.map_err(|error| format!("{} {error}", tr("설정을 저장하지 못했습니다.", "The setting could not be saved.")))
 }
 
 /// White or dark, chosen in the menu (first launch follows the system).

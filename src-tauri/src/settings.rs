@@ -43,6 +43,8 @@ pub struct Settings {
     pub memo_height: f64,
     /// File name of the imported custom character inside the data folder.
     pub custom_character_file: Option<String>,
+    /// The first-run tip (click to open, right-click for settings) was dismissed.
+    pub tip_seen: bool,
 }
 
 impl Default for Settings {
@@ -55,6 +57,7 @@ impl Default for Settings {
             memo_width: DEFAULT_MEMO_SIZE.0,
             memo_height: DEFAULT_MEMO_SIZE.1,
             custom_character_file: None,
+            tip_seen: false,
         }
     }
 }
@@ -106,6 +109,16 @@ impl Settings {
             fs::set_permissions(&temporary, fs::Permissions::from_mode(0o600))?;
         }
         fs::rename(&temporary, &target)
+    }
+
+    /// Marks the first-run tip as seen, but only once that is on disk, so a
+    /// failed save leaves it showing and it can be dismissed again.
+    pub fn dismiss_tip(&mut self, dir: &Path) -> std::io::Result<()> {
+        let mut next = self.clone();
+        next.tip_seen = true;
+        next.save(dir)?;
+        *self = next;
+        Ok(())
     }
 }
 
@@ -174,5 +187,31 @@ mod compatibility_tests {
         assert_eq!(settings.character_choice, CharacterChoice::Classic);
         assert_eq!(settings.memo_width, 490.0);
         assert_eq!(settings.theme, None);
+        // Written before the first-run tip existed: the tip still shows once.
+        assert!(!settings.tip_seen);
+    }
+
+    #[test]
+    fn tip_stays_when_it_cannot_be_saved() {
+        let dir = tempfile::tempdir().unwrap();
+        // A folder where the temporary file goes makes the save fail.
+        fs::create_dir(dir.path().join(".settings.json.tmp")).unwrap();
+        let mut settings = Settings::default();
+        assert!(settings.dismiss_tip(dir.path()).is_err());
+        assert!(!settings.tip_seen);
+        fs::remove_dir(dir.path().join(".settings.json.tmp")).unwrap();
+        settings.dismiss_tip(dir.path()).unwrap();
+        assert!(settings.tip_seen);
+        assert!(Settings::load(dir.path()).tip_seen);
+    }
+
+    #[test]
+    fn dismissed_tip_is_remembered() {
+        let dir = tempfile::tempdir().unwrap();
+        let settings = Settings { tip_seen: true, ..Settings::default() };
+        settings.save(dir.path()).unwrap();
+        assert!(Settings::load(dir.path()).tip_seen);
+        let json = String::from_utf8(fs::read(Settings::path(dir.path())).unwrap()).unwrap();
+        assert!(json.contains("\"tipSeen\": true") || json.contains("\"tipSeen\":true"), "{json}");
     }
 }
