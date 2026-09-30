@@ -1,0 +1,471 @@
+/* Memo bubble. Follows Apple's macOS Human Interface Guidelines:
+   important content first, secondary info muted,
+   clear hover / selected / keyboard-focus states, no hidden-only commands,
+   motion only for real state, Reduce Motion respected. */
+
+:root {
+  color-scheme: light;
+  --bg: #ffffff;
+  --bar: #f5f5f7;
+  --line: rgba(0, 0, 0, 0.09);
+  --text: #1d1d1f;
+  --muted: #6e6e73;
+  --hover: rgba(0, 0, 0, 0.05);
+  --selected: rgba(0, 0, 0, 0.08);
+  --accent: #007aff;
+  --danger: #d70015;
+  --popover: #ffffff;
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.18), 0 0 0 0.5px rgba(0, 0, 0, 0.12);
+  font: 13px/1.35 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Segoe UI", "Malgun Gothic", system-ui, sans-serif;
+}
+
+@supports (color: AccentColor) {
+  :root {
+    --accent: AccentColor;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+    --bg: #1e1e20;
+    --bar: #28282b;
+    --line: rgba(255, 255, 255, 0.09);
+    --text: #f5f5f7;
+    --muted: #a1a1a6;
+    --hover: rgba(255, 255, 255, 0.07);
+    --selected: rgba(255, 255, 255, 0.12);
+    --accent: #0a84ff;
+    --danger: #ff453a;
+    --popover: #2c2c2f;
+    --shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 0 0.5px rgba(255, 255, 255, 0.14);
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: default;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+#memo {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* ---------- toolbar: tabs, +, tools ---------- */
+
+#toolbar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 2px;
+  height: 36px;
+  padding: 0 6px 0 8px;
+  background: var(--bar);
+  border-bottom: 1px solid var(--line);
+}
+
+#tabs {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+#tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.tab-item {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  border-radius: 6px;
+}
+
+.tab-item:hover {
+  background: var(--hover);
+}
+
+/* The open note's tab is a little lighter. Tabs show only their title; the
+   pointer or keyboard focus widens a tab to make room for rename/delete.
+   Delete always asks first, so a widened neighbour under
+   the pointer cannot remove a note by itself. */
+.tab-item.selected {
+  background: var(--selected);
+}
+
+.tab {
+  display: block;
+  height: 24px;
+  max-width: 128px;
+  padding: 0 10px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  transition: padding-right 0.12s, max-width 0.12s;
+}
+
+.tab-item.selected .tab {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.tab-item:is(:hover, :has(:focus-visible)) .tab {
+  max-width: 176px;
+  padding-right: 50px;
+}
+
+.tab-actions {
+  position: absolute;
+  top: 50%;
+  right: 3px;
+  display: flex;
+  gap: 1px;
+  transform: translateY(-50%);
+  visibility: hidden;
+}
+
+.tab-item:is(:hover, :has(:focus-visible)) .tab-actions {
+  visibility: visible;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tab {
+    transition: none;
+  }
+}
+
+.tab-item.dragging {
+  opacity: 0.45;
+}
+
+.tab-item.drop-before::before,
+.tab-item.drop-after::after {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+  content: "";
+}
+
+.tab-item.drop-before::before {
+  left: -2px;
+}
+
+.tab-item.drop-after::after {
+  right: -2px;
+}
+
+.icon-button {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+}
+
+.icon-button svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.icon-button:hover:not(:disabled) {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.icon-button:disabled {
+  opacity: 0.4;
+}
+
+#add {
+  width: 24px;
+  height: 24px;
+  margin-left: 2px;
+}
+
+#tools {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+  padding-left: 6px;
+}
+
+#tools .tool {
+  width: 28px;
+  height: 26px;
+}
+
+#tools .tool svg {
+  width: 15px;
+  height: 15px;
+}
+
+#tools .tool[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+}
+
+/* ---------- sheet: text + drawing ---------- */
+
+#scroller {
+  position: relative;
+  flex: 1 1 auto;
+  overflow: auto;
+}
+
+#sheet {
+  position: relative;
+}
+
+#editor {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
+  padding: 10px 14px;
+  overflow: hidden;
+  border: 0;
+  outline: none;
+  resize: none;
+  background: transparent;
+  color: var(--text);
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Segoe UI", "Malgun Gothic", system-ui, sans-serif;
+  -webkit-user-select: text;
+  user-select: text;
+  cursor: text;
+}
+
+#editor::placeholder {
+  color: var(--muted);
+}
+
+#canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  touch-action: none;
+}
+
+#memo:not([data-tool="none"]) #canvas {
+  pointer-events: auto;
+}
+
+#memo[data-tool="draw"] #canvas {
+  cursor: crosshair;
+}
+
+#memo[data-tool="erase"] #canvas {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22'%3E%3Ccircle cx='11' cy='11' r='9' fill='rgba(128,128,128,.12)' stroke='%23888' stroke-width='1.2'/%3E%3C/svg%3E") 11 11, crosshair;
+}
+
+#memo:not([data-tool="none"]) #editor {
+  cursor: default;
+}
+
+/* ---------- status line ---------- */
+
+#status {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-top: 1px solid var(--line);
+  background: var(--bar);
+  font-size: 12px;
+}
+
+#status[hidden] {
+  display: none;
+}
+
+#status[data-kind="error"] #status-text {
+  color: var(--danger);
+}
+
+#status-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+#status-action {
+  flex: 0 0 auto;
+  padding: 2px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+}
+
+/* ---------- menu and dialogs ---------- */
+
+#tab-menu,
+#size-menu {
+  position: fixed;
+  z-index: 20;
+  min-width: 148px;
+  padding: 5px;
+  border-radius: 8px;
+  background: var(--popover);
+  box-shadow: var(--shadow);
+}
+
+#tab-menu[hidden],
+#size-menu[hidden] {
+  display: none;
+}
+
+#tab-menu button,
+#size-menu button {
+  display: block;
+  width: 100%;
+  padding: 5px 9px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  text-align: left;
+}
+
+#tab-menu button:is(:hover, :focus-visible),
+#size-menu button:is(:hover, :focus-visible) {
+  background: var(--accent);
+  color: #fff;
+  outline: none;
+}
+
+dialog {
+  width: min(280px, calc(100vw - 32px));
+  padding: 16px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--popover);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+
+dialog::backdrop {
+  background: rgba(0, 0, 0, 0.12);
+}
+
+dialog h2 {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+dialog p {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 12px;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+dialog input {
+  box-sizing: border-box;
+  width: 100%;
+  margin: 2px 0 12px;
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.dialog-actions button {
+  min-width: 64px;
+  padding: 4px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+}
+
+.dialog-actions button.primary {
+  border-color: transparent;
+  background: var(--accent);
+  color: #fff;
+}
+
+.dialog-actions button.destructive {
+  border-color: transparent;
+  background: var(--danger);
+  color: #fff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+}
+
+#size-menu .size-title {
+  padding: 3px 9px 4px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+#size-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#size-menu .check {
+  width: 12px;
+  text-align: center;
+}
+
+#size-menu .dot {
+  display: inline-block;
+  border-radius: 50%;
+  background: currentColor;
+}

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Mac App Store requires the App Sandbox. -->
+    <key>com.apple.security.app-sandbox</key>
+    <true/>
+    <!-- Reading the custom character image the person picks. -->
+    <key>com.apple.security.files.user-selected.read-only</key>
+    <true/>
+    <!-- WebKit in the App Sandbox needs this to load the app's own pages
+         (without it the memo window is blank; verified 2026-09-30).
+         MemoPet itself makes no network requests. -->
+    <key>com.apple.security.network.client</key>
+    <true/>
+</dict>
+</plist>

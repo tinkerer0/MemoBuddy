@@ -2,31 +2,33 @@ name: CI
 
 on:
   push:
-    branches:
-      - main
   pull_request:
 
 permissions:
   contents: read
 
-concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  test-and-package:
-    runs-on: macos-latest
-    timeout-minutes: 15
-
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
-      - name: Check out source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Run tests
-        run: swift test
-
-      - name: Build and package Universal app
-        run: ./scripts/package-release.sh
-
-      - name: Verify app signature
-        run: codesign --verify --deep --strict dist/MemoPet.app
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npx vitest run
+      - run: cargo test --manifest-path src-tauri/Cargo.toml
+      - name: Build app (no installer)
+        run: npm run tauri -- build --no-bundle
+      - uses: actions/upload-artifact@v4
+        if: matrix.os == 'windows-latest'
+        with:
+          name: memopet-windows-exe
+          path: src-tauri/target/release/memopet.exe

@@ -1,8 +1,40 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
 .DS_Store
-.build/
-.swiftpm/
-dist/
-tmp/
-*.xcodeproj/
-*.xcworkspace/
-xcuserdata/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Orchestration run records (local only)
+work/
+
+# Agent worktrees (local only)
+.claude/
+
+# Store build outputs and account-specific signing files (never commit)
+src-tauri/Entitlements.appstore.plist
+src-tauri/embedded.provisionprofile
+src-tauri/tauri.appstore.conf.json
+dist-mas/
+packaging/windows/stage/
+packaging/windows/Package.appxmanifest
+packaging/windows/devcert.*
+*.msix

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Menu bar app: no Dock icon. -->
+    <key>LSUIElement</key>
+    <true/>
+    <key>ITSAppUsesNonExemptEncryption</key>
+    <false/>
+    <!-- The UI is Korean and English; without this, system menus such as the
+         text field context menu stay in the development language (English). -->
+    <key>CFBundleLocalizations</key>
+    <array>
+        <string>ko</string>
+        <string>en</string>
+    </array>
+    <key>NSHumanReadableCopyright</key>
+    <string>© 2026 MemoPet</string>
+</dict>
+</plist>

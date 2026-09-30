@@ -12,15 +12,15 @@ body:
     id: memopet-version
     attributes:
       label: MemoPet version
-      description: In Finder, select MemoPet.app and choose File → Get Info.
+      description: "macOS: select MemoPet.app in Finder and choose File → Get Info. Windows: Settings → Apps → Installed apps."
       placeholder: Shown as Version in Finder
     validations:
       required: true
   - type: input
     id: macos-version
     attributes:
-      label: macOS version and Mac
-      placeholder: macOS 15.5, Apple Silicon
+      label: Operating system and computer
+      placeholder: macOS 15.5 (Apple Silicon) / Windows 11
     validations:
       required: true
   - type: textarea

@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MemoPet</title>
+    <link rel="stylesheet" href="/src/bubble/style.css" />
+  </head>
+  <body>
+    <main id="memo" data-tool="none">
+      <header id="toolbar">
+        <div id="tabs" role="tablist"></div>
+        <button id="add" class="icon-button" type="button">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>
+        </button>
+        <div id="tools" role="toolbar">
+          <button id="pen" class="icon-button tool" type="button" aria-pressed="false">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m10.5 2.5 3 3-7.8 7.8-3.6.6.6-3.6z" /><path d="m9 4 3 3" /></svg>
+          </button>
+          <button id="eraser" class="icon-button tool" type="button" aria-pressed="false">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m6.2 13.5-3.4-3.4a1 1 0 0 1 0-1.4l6-6a1 1 0 0 1 1.4 0l3.4 3.4a1 1 0 0 1 0 1.4l-5.6 5.6" /><path d="M6.2 13.5H13.5M5 7l4 4" /></svg>
+          </button>
+        </div>
+      </header>
+      <div id="scroller">
+        <div id="sheet">
+          <textarea id="editor" spellcheck="false"></textarea>
+          <canvas id="canvas"></canvas>
+        </div>
+      </div>
+      <div id="status" hidden>
+        <span id="status-text" role="status"></span>
+        <button id="status-action" type="button"></button>
+      </div>
+    </main>
+    <script type="module" src="/src/bubble/main.ts"></script>
+  </body>
+</html>

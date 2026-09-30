@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MemoPet Character</title>
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; -webkit-user-select: none; user-select: none; }
+      #character { display: block; width: 100%; height: 100%; padding: 0; border: 0; background: transparent; cursor: default; }
+      #character img, #character svg { display: block; width: 100%; height: 100%; object-fit: contain; pointer-events: none; -webkit-user-drag: none; }
+      #character:focus-visible { outline: 2px solid #0a84ff; outline-offset: -2px; border-radius: 50%; }
+      .classic-bg { fill: #000; } .classic-fg { stroke: #fff; }
+      :root[data-theme="dark"] .classic-bg { fill: #fff; } :root[data-theme="dark"] .classic-fg { stroke: #000; }
+    </style>
+  </head>
+  <body>
+    <button id="character" type="button"></button>
+    <script type="module" src="/src/character/main.ts"></script>
+  </body>
+</html>
