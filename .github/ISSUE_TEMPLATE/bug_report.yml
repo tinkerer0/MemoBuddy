@@ -1,5 +1,5 @@
 name: Bug report
-description: Report a reproducible MemoPet problem
+description: Report a reproducible MemoBuddy problem
 title: "[Bug]: "
 labels:
   - bug
@@ -7,12 +7,12 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for helping improve MemoPet. Do not attach `notes.json`, custom character files, screenshots containing private notes, or other personal data unless you have reviewed and intentionally removed sensitive content.
+        Thanks for helping improve MemoBuddy. Do not attach `notes.json`, custom character files, screenshots containing private notes, or other personal data unless you have reviewed and intentionally removed sensitive content.
   - type: input
     id: memopet-version
     attributes:
-      label: MemoPet version
-      description: "macOS: select MemoPet.app in Finder and choose File → Get Info. Windows: Settings → Apps → Installed apps."
+      label: MemoBuddy version
+      description: "macOS: select MemoBuddy.app in Finder and choose File → Get Info. Windows: Settings → Apps → Installed apps."
       placeholder: Shown as Version in Finder
     validations:
       required: true
@@ -35,7 +35,7 @@ body:
     attributes:
       label: Steps to reproduce
       placeholder: |
-        1. Open MemoPet
+        1. Open MemoBuddy
         2. ...
     validations:
       required: true

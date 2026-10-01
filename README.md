@@ -1,4 +1,6 @@
-# MemoPet
+# MemoBuddy
+
+(Formerly MemoPet.)
 
 A tiny notebook that floats above your apps, for macOS and Windows.
 
@@ -7,16 +9,17 @@ Click the little character to open a memo. Type or draw, click elsewhere, and it
 - Tabs for multiple notes (add, rename, drag to reorder, delete with confirmation)
 - Text and drawing in the same note (pen and round eraser)
 - Automatic local saving with a backup and damaged-file recovery
-- Three built-in characters or your own GIF/PNG/JPEG/WebP, in three sizes
+- Nine characters (a writing bear, a penguin, a ghost, a shiba, a humble pebble, planets and a moon), in three sizes
+- Any photo or GIF you like as the pet: right-click the pet → Character → Choose Image…
 - Menu bar / system tray controls, white or dark theme
 - Three pen widths and eraser sizes (right-click the pen or eraser)
-- No account, ads, tracking or network use
+- No account, ads or tracking; it sends nothing anywhere (the menu can open the privacy policy and license pages in your browser)
 
-## Get MemoPet
+## Get MemoBuddy
 
 Mac App Store and Microsoft Store versions are being prepared. Until they are out, build it from source (below).
 
-Windows testers: open the latest successful [CI run](https://github.com/tinkerer0/MemoPet/actions/workflows/ci.yml) and download the `MemoPet-windows-installer` artifact (GitHub sign-in required, kept for 90 days). It is not code-signed yet, so Windows SmartScreen asks first: choose **More info → Run anyway**. It installs for the current user without administrator rights.
+Developers who want to try a Windows build before the Store version can download the `MemoBuddy-windows-installer` artifact from the latest successful [CI run](https://github.com/tinkerer0/MemoBuddy/actions/workflows/ci.yml) (GitHub sign-in required, kept for 90 days). It is an unsigned test build, so Windows SmartScreen warns about it; everyone else should wait for the Microsoft Store version, which Microsoft signs.
 
 The original macOS-only Swift/AppKit MemoPet (v0.4.1 and earlier) stays in this repository's history: `git checkout v0.4.1`.
 
@@ -37,6 +40,12 @@ cargo test --manifest-path src-tauri/Cargo.toml   # Rust tests
 ```
 
 `compat/check.sh` reads notes with the real Swift `MemoPetCore`, so it needs the Swift source next to this folder as `memo_pet`, for example `git worktree add ../memo_pet v0.4.1`.
+
+## Adding a character
+
+1. Draw or generate the character on a plain chroma-green (`#00FF00`) background and save it in `art/characters/`.
+2. Make the GIF: `python3 scripts/character-gif.py art/characters/<name>.png public/characters/<name>.gif --motion waddle` (motions: `waddle`, `float`, `bounce`, `wobble`, `orbit`, `twinkle`; needs Pillow and numpy).
+3. Add a line to `BUILT_IN` in `src-tauri/src/characters.rs`. Its `id` is saved in settings, so never change it after a release.
 
 ## Release
 

@@ -98,7 +98,7 @@ async function start() {
   } catch {
     // Keep the browser language.
   }
-  button.ariaLabel = button.title = t("MemoPet 메모 열기", "Open MemoPet memo");
+  button.ariaLabel = button.title = t("MemoBuddy 메모 열기", "Open MemoBuddy memo");
   const look = await invoke<Look>("character_look");
   if (!lookChanged) render(look);
 }

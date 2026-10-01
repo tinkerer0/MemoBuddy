@@ -10,19 +10,20 @@ use std::time::{Duration, Instant};
 
 use objc2::rc::Retained;
 use objc2::runtime::AnyObject;
-use objc2::{define_class, msg_send, sel, AllocAnyThread, DefinedClass, MainThreadMarker, MainThreadOnly};
+use objc2::{define_class, msg_send, sel, DefinedClass, MainThreadMarker, MainThreadOnly};
 use objc2_app_kit::{
     NSAppearance, NSAppearanceCustomization, NSAppearanceNameAqua, NSAppearanceNameDarkAqua, NSApplication, NSApplicationActivationOptions,
-    NSBackingStoreType, NSBezierPath, NSBitmapImageRep, NSColor, NSControlStateValueOff, NSControlStateValueOn, NSEvent, NSImage,
+    NSBackingStoreType, NSBezierPath, NSBitmapImageRep, NSColor, NSControlStateValueOff, NSControlStateValueOn, NSEvent,
     NSImageCurrentFrame, NSImageCurrentFrameDuration, NSImageFrameCount, NSMenu, NSMenuItem, NSPanel, NSRunningApplication, NSScreen, NSView,
     NSWindow, NSWindowCollectionBehavior, NSWindowStyleMask, NSWorkspace,
 };
-use objc2_foundation::{NSArray, NSData, NSMutableArray, NSNumber, NSPoint, NSRect, NSSize, NSString};
+use objc2_foundation::{NSArray, NSData, NSMutableArray, NSNumber, NSPoint, NSRect, NSSize, NSString, NSURL};
 use objc2_quartz_core::{kCAAnimationDiscrete, kCAGravityResizeAspect, CAKeyframeAnimation, CALayer, CAMediaTiming};
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 
 use crate::app::{self, MenuAction, MenuEntry, BUBBLE_LABEL};
 use crate::core::placement::Rect;
+use crate::characters;
 use crate::settings::{CharacterChoice, Settings, Theme, MAX_MEMO_SIZE, MIN_MEMO_SIZE};
 
 static APP: OnceLock<AppHandle> = OnceLock::new();
@@ -36,7 +37,7 @@ thread_local! {
 }
 
 fn mtm() -> MainThreadMarker {
-    MainThreadMarker::new().expect("MemoPet window code must run on the main thread")
+    MainThreadMarker::new().expect("MemoBuddy window code must run on the main thread")
 }
 
 // ---------- coordinates ----------
@@ -129,7 +130,7 @@ define_class!(
     // SAFETY: NSView has no subclassing requirements; CharacterView does not implement Drop.
     #[unsafe(super(NSView))]
     #[thread_kind = MainThreadOnly]
-    #[name = "MemoPetCharacterView"]
+    #[name = "MemoBuddyCharacterView"]
     #[ivars = CharacterIvars]
     pub struct CharacterView;
 
@@ -226,7 +227,7 @@ define_class!(
 
         #[unsafe(method_id(accessibilityLabel))]
         fn accessibility_label(&self) -> Retained<NSString> {
-            NSString::from_str(crate::i18n::tr("MemoPet 메모 열기", "Open MemoPet memo"))
+            NSString::from_str(crate::i18n::tr("MemoBuddy 메모 열기", "Open MemoBuddy memo"))
         }
 
         #[unsafe(method(accessibilityPerformPress))]
@@ -369,10 +370,10 @@ pub fn setup(app: &AppHandle, settings: &Settings) -> Result<(), String> {
     CHARACTER.with(|cell| *cell.borrow_mut() = Some((panel, view)));
 
     // Memo: an ordinary Tauri window made transparent with public NSWindow
-    // properties. Opening it activates MemoPet (like the Swift app); explicit
+    // properties. Opening it activates MemoBuddy (like the Swift app); explicit
     // closes hand focus back to the app that was in front.
     let window = WebviewWindowBuilder::new(app, BUBBLE_LABEL, WebviewUrl::App("bubble.html".into()))
-        .title("MemoPet")
+        .title("MemoBuddy")
         .decorations(false)
         .resizable(true)
         .visible(false)
@@ -434,11 +435,10 @@ pub fn set_character_visible(_app: &AppHandle, visible: bool) {
     });
 }
 
-pub fn set_character(_app: &AppHandle, choice: CharacterChoice, custom: Option<&Path>, size: f64) {
+pub fn set_character(app: &AppHandle, choice: CharacterChoice, custom: Option<&Path>, size: f64) {
     let bytes: Option<Vec<u8>> = match choice {
         CharacterChoice::Classic => None,
-        CharacterChoice::MemoWriter => Some(include_bytes!("../../assets/default-character.gif").to_vec()),
-        CharacterChoice::OrbitingPlanet => Some(include_bytes!("../../assets/orbiting-planet.gif").to_vec()),
+        CharacterChoice::Builtin(builtin) => characters::bytes(app, builtin),
         CharacterChoice::Custom => custom.and_then(|path| std::fs::read(path).ok()),
     };
     let animate = !reduce_motion();
@@ -492,12 +492,7 @@ fn decode_frames(bytes: &[u8], animate: bool) -> Vec<Frame> {
     if pixels > MAX_IMAGE_PIXELS {
         return Vec::new();
     }
-    let mut count = rep
-        .valueForProperty(unsafe { NSImageFrameCount })
-        .and_then(|value| value.downcast::<NSNumber>().ok())
-        .map(|number| number.integerValue())
-        .unwrap_or(1)
-        .max(1);
+    let mut count = frame_count(&rep);
     if !animate || count > MAX_ANIMATION_FRAMES || count.saturating_mul(pixels) > MAX_ANIMATION_PIXELS {
         count = 1;
     }
@@ -551,7 +546,12 @@ fn animate_frames(layer: &CALayer, frames: &[Frame]) {
     layer.addAnimation_forKey(&animation, Some(&NSString::from_str("frames")));
 }
 
-/// Brings MemoPet to the front for a dialog it is about to show (image picker,
+/// Opens a web page in the default browser. Returns whether it opened.
+pub fn open_url(_app: &AppHandle, url: &str) -> bool {
+    NSURL::URLWithString(&NSString::from_str(url)).is_some_and(|url| NSWorkspace::sharedWorkspace().openURL(&url))
+}
+
+/// Brings MemoBuddy to the front for a dialog it is about to show (image picker,
 /// message). Without this the dialog appears, but typing still goes to the app
 /// that was in front. The memo window does this itself through `set_focus`.
 pub fn activate_app(_app: &AppHandle) {
@@ -560,11 +560,25 @@ pub fn activate_app(_app: &AppHandle) {
     NSApplication::sharedApplication(mtm).activateIgnoringOtherApps(true);
 }
 
+/// Whether a picked image can be shown in full: it decodes, and it is within
+/// the character view's limits (one frame 16 MP; an animation 240 frames and
+/// 24 MP in all), so the view never falls back to Classic or a still frame.
 pub fn image_is_decodable(bytes: &[u8]) -> bool {
-    NSImage::initWithData(NSImage::alloc(), &NSData::with_bytes(bytes)).is_some_and(|image| {
-        let size = image.size();
-        size.width > 0.0 && size.height > 0.0
-    })
+    let Some(rep) = NSBitmapImageRep::imageRepWithData(&NSData::with_bytes(bytes)) else { return false };
+    let pixels = rep.pixelsWide().max(1).saturating_mul(rep.pixelsHigh().max(1));
+    let count = frame_count(&rep);
+    let fits = pixels <= MAX_IMAGE_PIXELS
+        && count <= MAX_ANIMATION_FRAMES
+        && (count == 1 || count.saturating_mul(pixels) <= MAX_ANIMATION_PIXELS);
+    fits && rep.CGImage().is_some()
+}
+
+fn frame_count(rep: &NSBitmapImageRep) -> isize {
+    rep.valueForProperty(unsafe { NSImageFrameCount })
+        .and_then(|value| value.downcast::<NSNumber>().ok())
+        .map(|number| number.integerValue())
+        .unwrap_or(1)
+        .max(1)
 }
 
 // ---------- memo bubble ----------
@@ -693,12 +707,22 @@ pub fn show_character_menu(_app: &AppHandle) {}
 mod tests {
     use super::decode_frames;
 
-    const WRITER: &[u8] = include_bytes!("../../assets/default-character.gif");
+    const WRITER: &[u8] = include_bytes!("../../../public/characters/memo-writer.gif");
 
     #[test]
     fn decodes_every_frame_only_when_animating() {
         assert_eq!(decode_frames(WRITER, true).len(), 30);
         assert_eq!(decode_frames(WRITER, false).len(), 1);
+    }
+
+    #[test]
+    fn every_built_in_character_animates() {
+        // A GIF past the limits of decode_frames would quietly show only its first frame.
+        for builtin in crate::characters::BUILT_IN {
+            let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../public/characters").join(builtin.file);
+            let frames = decode_frames(&std::fs::read(&path).unwrap(), true);
+            assert!(frames.len() > 1, "{} plays {} frame(s)", builtin.file, frames.len());
+        }
     }
 
     #[test]
@@ -708,5 +732,14 @@ mod tests {
         // 4100 × 4100 is just over the pixel limit for one frame: nothing (Classic).
         assert!(decode_frames(include_bytes!("../../test-fixtures/4100x4100.png"), true).is_empty());
         assert!(decode_frames(b"not an image", true).is_empty());
+    }
+
+    #[test]
+    fn picking_refuses_what_the_view_cannot_show() {
+        assert!(super::image_is_decodable(WRITER));
+        // Over the animation limits: refused when picked, not shown as a still.
+        assert!(!super::image_is_decodable(include_bytes!("../../test-fixtures/241-frames.gif")));
+        assert!(!super::image_is_decodable(include_bytes!("../../test-fixtures/4100x4100.png")));
+        assert!(!super::image_is_decodable(b"not an image"));
     }
 }

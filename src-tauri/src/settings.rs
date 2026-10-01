@@ -5,21 +5,67 @@ use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+use crate::characters::{self, Builtin};
 
 pub const CHARACTER_SIZES: [f64; 3] = [56.0, 80.0, 112.0];
 pub const DEFAULT_CHARACTER_SIZE: f64 = 80.0;
 pub const DEFAULT_MEMO_SIZE: (f64, f64) = (380.0, 300.0);
 pub const MIN_MEMO_SIZE: (f64, f64) = (300.0, 200.0);
 pub const MAX_MEMO_SIZE: (f64, f64) = (760.0, 620.0);
+/// The only names the picked character image is stored under (app.rs imports it).
+pub const CUSTOM_CHARACTER_FILES: [&str; 4] = ["custom-character.gif", "custom-character.png", "custom-character.jpg", "custom-character.webp"];
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+/// The character on screen: the drawn Classic one, a built-in GIF
+/// (`characters::BUILT_IN`), or the picked image. Saved as its id
+/// ("classic", "memoWriter", "orbitingPlanet", …, "custom").
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CharacterChoice {
     Classic,
-    MemoWriter,
-    OrbitingPlanet,
+    Builtin(&'static Builtin),
     Custom,
+}
+
+impl CharacterChoice {
+    pub fn id(self) -> &'static str {
+        match self {
+            CharacterChoice::Classic => "classic",
+            CharacterChoice::Builtin(builtin) => builtin.id,
+            CharacterChoice::Custom => "custom",
+        }
+    }
+
+    pub fn from_id(id: &str) -> Option<Self> {
+        match id {
+            "classic" => Some(CharacterChoice::Classic),
+            "custom" => Some(CharacterChoice::Custom),
+            other => characters::find(other).map(CharacterChoice::Builtin),
+        }
+    }
+}
+
+impl Default for CharacterChoice {
+    fn default() -> Self {
+        CharacterChoice::Builtin(&characters::BUILT_IN[0])
+    }
+}
+
+impl Serialize for CharacterChoice {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.id())
+    }
+}
+
+impl<'de> Deserialize<'de> for CharacterChoice {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        // An id this version does not know (e.g. written by a newer version),
+        // or a value that is not an id at all, falls back to the default
+        // instead of discarding every other setting. Reading any JSON value
+        // consumes arrays and objects whole.
+        let value = serde_json::Value::deserialize(deserializer)?;
+        Ok(value.as_str().and_then(CharacterChoice::from_id).unwrap_or_default())
+    }
 }
 
 /// The memo and character colors: white or dark.
@@ -52,7 +98,7 @@ impl Default for Settings {
         Self {
             character_origin: None,
             character_size: DEFAULT_CHARACTER_SIZE,
-            character_choice: CharacterChoice::MemoWriter,
+            character_choice: CharacterChoice::default(),
             theme: None,
             memo_width: DEFAULT_MEMO_SIZE.0,
             memo_height: DEFAULT_MEMO_SIZE.1,
@@ -88,8 +134,14 @@ impl Settings {
                 self.character_origin = None;
             }
         }
+        // The app only ever writes these names; anything else (a path, "..",
+        // another data file) would let a damaged or edited settings file make
+        // the app read or delete a file it did not create.
+        if !self.custom_character_file.as_deref().is_some_and(|name| CUSTOM_CHARACTER_FILES.contains(&name)) {
+            self.custom_character_file = None;
+        }
         if self.character_choice == CharacterChoice::Custom && self.custom_character_file.is_none() {
-            self.character_choice = CharacterChoice::MemoWriter;
+            self.character_choice = CharacterChoice::default();
         }
     }
 
@@ -142,7 +194,7 @@ mod tests {
         assert_eq!(settings.memo_width, DEFAULT_MEMO_SIZE.0);
         assert_eq!(settings.memo_height, MAX_MEMO_SIZE.1);
         assert_eq!(settings.character_origin, None);
-        assert_eq!(settings.character_choice, CharacterChoice::MemoWriter);
+        assert_eq!(settings.character_choice, CharacterChoice::default());
     }
 
     #[test]
@@ -189,6 +241,47 @@ mod compatibility_tests {
         assert_eq!(settings.theme, None);
         // Written before the first-run tip existed: the tip still shows once.
         assert!(!settings.tip_seen);
+    }
+
+    #[test]
+    fn character_ids_round_trip_and_unknown_ones_fall_back() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(Settings::path(dir.path()), br#"{"characterChoice":"orbitingPlanet","memoWidth":500.0}"#).unwrap();
+        let settings = Settings::load(dir.path());
+        assert_eq!(settings.character_choice.id(), "orbitingPlanet");
+        settings.save(dir.path()).unwrap();
+        let json = String::from_utf8(fs::read(Settings::path(dir.path())).unwrap()).unwrap();
+        assert!(json.contains("\"characterChoice\": \"orbitingPlanet\""), "{json}");
+
+        // A character from a newer version, or a value that is not an id at
+        // all: default character, other settings kept.
+        for value in [r#""dragon""#, "null", "17", "true", "[]", r#"{"id":"penguin"}"#] {
+            let json = format!(r#"{{"characterChoice":{value},"memoWidth":500.0,"theme":"dark","tipSeen":true}}"#);
+            fs::write(Settings::path(dir.path()), json).unwrap();
+            let settings = Settings::load(dir.path());
+            assert_eq!(settings.character_choice, CharacterChoice::default(), "{value}");
+            assert_eq!((settings.memo_width, settings.theme, settings.tip_seen), (500.0, Some(Theme::Dark), true), "{value}");
+        }
+    }
+
+    #[test]
+    fn only_the_apps_own_image_names_are_kept() {
+        let dir = tempfile::tempdir().unwrap();
+        for bad in ["../outside.png", "/etc/hosts", "notes.json", "custom-character.gif/../notes.json", "custom-character.bmp", ""] {
+            let json = format!(r#"{{"characterChoice":"custom","customCharacterFile":{bad:?},"memoWidth":500.0}}"#);
+            fs::write(Settings::path(dir.path()), json).unwrap();
+            let settings = Settings::load(dir.path());
+            assert_eq!(settings.custom_character_file, None, "{bad}");
+            assert_eq!(settings.character_choice, CharacterChoice::default(), "{bad}");
+            assert_eq!(settings.memo_width, 500.0, "{bad}");
+        }
+        for good in CUSTOM_CHARACTER_FILES {
+            let json = format!(r#"{{"characterChoice":"custom","customCharacterFile":{good:?}}}"#);
+            fs::write(Settings::path(dir.path()), json).unwrap();
+            let settings = Settings::load(dir.path());
+            assert_eq!(settings.custom_character_file.as_deref(), Some(good));
+            assert_eq!(settings.character_choice, CharacterChoice::Custom);
+        }
     }
 
     #[test]

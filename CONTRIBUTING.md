@@ -1,6 +1,6 @@
-# Contributing to MemoPet
+# Contributing to MemoBuddy
 
-MemoPet aims to stay small, light, and easy to understand. Focused bug fixes and lightweight improvements are welcome.
+MemoBuddy aims to stay small, light, and easy to understand. Focused bug fixes and lightweight improvements are welcome.
 
 ## Before changing code
 
@@ -10,7 +10,7 @@ MemoPet aims to stay small, light, and easy to understand. Focused bug fixes and
 
 ## Local checks
 
-MemoPet 1.0 is built with Tauri 2. You need Node.js 20 or later and Rust (rustup); on macOS also the Xcode command line tools. macOS 13 or later, Windows 10 or later.
+MemoBuddy 1.0 is built with Tauri 2. You need Node.js 20 or later and Rust (rustup); on macOS also the Xcode command line tools. macOS 13 or later, Windows 10 or later for development (the Microsoft Store package needs Windows 11, which includes WebView2).
 
 ```bash
 npm install
@@ -24,7 +24,7 @@ For UI changes, check white and dark themes, multiple memo sizes, screen edges, 
 
 ## Releases
 
-A user-facing MemoPet update is complete only after all of these steps:
+A user-facing MemoBuddy update is complete only after all of these steps:
 
 1. Update the semantic version in `package.json`, `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml`.
 2. Run the local checks above and `npm run tauri build`.
@@ -35,7 +35,7 @@ A user-facing MemoPet update is complete only after all of these steps:
 Pushing a commit alone does not notify installed apps. The older Swift
 MemoPet (v0.4.x) checks GitHub Releases, so publish a numbered Release only for
 a build intended for users. Store builds follow `docs/RELEASE.md`. Do not
-attach a prebuilt app while MemoPet is distributed as source code only.
+attach a prebuilt app while MemoBuddy is distributed as source code only.
 
 ## Pull requests
 

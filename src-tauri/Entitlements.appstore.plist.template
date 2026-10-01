@@ -9,7 +9,8 @@
     <true/>
     <!-- WebKit in the App Sandbox needs this to load the app's own pages
          (without it the memo window is blank; verified 2026-09-30).
-         MemoPet itself makes no network requests. -->
+         MemoBuddy itself makes no network requests; its menu only asks the
+         browser to open the privacy policy and license pages. -->
     <key>com.apple.security.network.client</key>
     <true/>
     <key>com.apple.application-identifier</key>

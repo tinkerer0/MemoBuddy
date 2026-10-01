@@ -41,14 +41,17 @@ JSON
 npm ci
 npm run tauri -- build --bundles app --target universal-apple-darwin --config src-tauri/tauri.appstore.conf.json
 
-APP="src-tauri/target/universal-apple-darwin/release/bundle/macos/MemoPet.app"
+APP="src-tauri/target/universal-apple-darwin/release/bundle/macos/MemoBuddy.app"
 codesign --verify --deep --strict "$APP"
 codesign -d --entitlements - "$APP" 2>/dev/null | grep -q "com.apple.security.app-sandbox"
+# The submitted binary itself: no private WebKit keys, and the license notices inside.
+./scripts/check-private-api.sh "$APP"
+test -s "$APP/Contents/Resources/THIRD_PARTY_LICENSES.md"
 
 mkdir -p dist-mas
-xcrun productbuild --sign "$INSTALLER_SIGN_IDENTITY" --component "$APP" /Applications dist-mas/MemoPet.pkg
-echo "Built dist-mas/MemoPet.pkg"
+xcrun productbuild --sign "$INSTALLER_SIGN_IDENTITY" --component "$APP" /Applications dist-mas/MemoBuddy.pkg
+echo "Built dist-mas/MemoBuddy.pkg"
 
 if [[ -n "${APPLE_API_KEY_ID:-}" && -n "${APPLE_API_ISSUER:-}" ]]; then
-  xcrun altool --upload-app --type macos --file dist-mas/MemoPet.pkg --apiKey "$APPLE_API_KEY_ID" --apiIssuer "$APPLE_API_ISSUER"
+  xcrun altool --upload-app --type macos --file dist-mas/MemoBuddy.pkg --apiKey "$APPLE_API_KEY_ID" --apiIssuer "$APPLE_API_ISSUER"
 fi

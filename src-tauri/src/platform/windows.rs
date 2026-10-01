@@ -18,6 +18,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 
 use crate::app::{self, BUBBLE_LABEL, CHARACTER_LABEL};
 use crate::core::placement::Rect;
+use crate::characters;
 use crate::settings::{CharacterChoice, Settings, Theme, MAX_MEMO_SIZE, MIN_MEMO_SIZE};
 
 static BUBBLE_SHOWN: AtomicBool = AtomicBool::new(false);
@@ -131,7 +132,7 @@ fn add_ex_style(window: &WebviewWindow, flags: u32) {
 
 pub fn setup(app: &AppHandle, settings: &Settings) -> Result<(), String> {
     let character = WebviewWindowBuilder::new(app, CHARACTER_LABEL, WebviewUrl::App("character.html".into()))
-        .title("MemoPet")
+        .title("MemoBuddy")
         .transparent(true)
         .decorations(false)
         .shadow(false)
@@ -147,7 +148,7 @@ pub fn setup(app: &AppHandle, settings: &Settings) -> Result<(), String> {
     add_ex_style(&character, WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW);
 
     let bubble = WebviewWindowBuilder::new(app, BUBBLE_LABEL, WebviewUrl::App("bubble.html".into()))
-        .title("MemoPet")
+        .title("MemoBuddy")
         .decorations(false)
         .shadow(true)
         .resizable(true)
@@ -209,8 +210,7 @@ pub fn set_character(app: &AppHandle, choice: CharacterChoice, custom: Option<&P
     }
     let source = match choice {
         CharacterChoice::Classic => None,
-        CharacterChoice::MemoWriter => Some("/default-character.gif".to_owned()),
-        CharacterChoice::OrbitingPlanet => Some("/orbiting-planet.gif".to_owned()),
+        CharacterChoice::Builtin(builtin) => Some(characters::url(builtin)),
         CharacterChoice::Custom => custom.and_then(|path| std::fs::read(path).ok()).map(|bytes| {
             let mime = match app::image_extension(&bytes) {
                 Some("gif") => "image/gif",
@@ -240,9 +240,54 @@ pub fn show_character_menu(app: &AppHandle) {
 /// macOS needs this before a dialog; Windows brings the dialog forward itself.
 pub fn activate_app(_app: &AppHandle) {}
 
+/// Opens a web page in the default browser. Returns whether it opened.
+pub fn open_url(_app: &AppHandle, url: &str) -> bool {
+    use windows_sys::Win32::UI::Shell::ShellExecuteW;
+    use windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+    let wide = |text: &str| text.encode_utf16().chain(std::iter::once(0)).collect::<Vec<u16>>();
+    let (verb, target) = (wide("open"), wide(url));
+    // SAFETY: both strings are NUL-terminated UTF-16 and outlive the call.
+    let result = unsafe { ShellExecuteW(std::ptr::null_mut(), verb.as_ptr(), target.as_ptr(), std::ptr::null(), std::ptr::null(), SW_SHOWNORMAL) };
+    // ShellExecuteW reports success with a value greater than 32.
+    result as isize > 32
+}
+
+/// The macOS character view's limits (one frame 16 MP; an animation 240
+/// frames and 24 MP in all), so both platforms refuse the same pictures when
+/// they are picked.
+const MAX_IMAGE_PIXELS: u64 = 16 * 1024 * 1024;
+const MAX_ANIMATION_FRAMES: u64 = 240;
+const MAX_ANIMATION_PIXELS: u64 = 24 * 1024 * 1024;
+
+/// Whether a picked image can be shown. The size comes from the header first,
+/// so a huge picture is refused before it is decoded; a GIF's frames are
+/// counted only up to the limits.
 pub fn image_is_decodable(bytes: &[u8]) -> bool {
-    app::image_extension(bytes).is_some()
-        && image::load_from_memory(bytes).is_ok_and(|image| image.width() > 0 && image.height() > 0)
+    let Some(pixels) = image::ImageReader::new(std::io::Cursor::new(bytes))
+        .with_guessed_format()
+        .ok()
+        .and_then(|reader| reader.into_dimensions().ok())
+        .filter(|&(width, height)| width > 0 && height > 0)
+        .map(|(width, height)| u64::from(width) * u64::from(height))
+    else {
+        return false;
+    };
+    let extension = app::image_extension(bytes);
+    if pixels > MAX_IMAGE_PIXELS || extension.is_none() || image::load_from_memory(bytes).is_err() {
+        return false;
+    }
+    if extension == Some("gif") {
+        use image::AnimationDecoder;
+        let Ok(decoder) = image::codecs::gif::GifDecoder::new(std::io::Cursor::new(bytes)) else { return false };
+        let mut count = 0u64;
+        for frame in decoder.into_frames() {
+            count += 1;
+            if frame.is_err() || count > MAX_ANIMATION_FRAMES || (count > 1 && count * pixels > MAX_ANIMATION_PIXELS) {
+                return false;
+            }
+        }
+    }
+    true
 }
 
 pub fn bubble_visible(_app: &AppHandle) -> bool {
@@ -316,5 +361,18 @@ pub fn set_theme(app: &AppHandle, theme: Theme) {
         if let Some(w) = window(app, label) {
             let _ = w.set_theme(Some(value));
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::image_is_decodable;
+
+    #[test]
+    fn picking_refuses_what_the_view_cannot_show() {
+        assert!(image_is_decodable(include_bytes!("../../../public/characters/memo-writer.gif")));
+        assert!(!image_is_decodable(include_bytes!("../../test-fixtures/241-frames.gif")));
+        assert!(!image_is_decodable(include_bytes!("../../test-fixtures/4100x4100.png")));
+        assert!(!image_is_decodable(b"not an image"));
     }
 }

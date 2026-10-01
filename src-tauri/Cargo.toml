@@ -1,8 +1,9 @@
 [package]
 name = "memopet"
-version = "0.1.0"
-description = "A Tauri App"
+version = "1.0.0"
+description = "A tiny pet on your desktop that keeps your notes"
 authors = ["tinkerer0"]
+license = "MIT"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -45,7 +46,7 @@ objc2-quartz-core = "0.3"
 
 [target."cfg(windows)".dependencies]
 image = { version = "0.25", default-features = false, features = ["gif", "png", "jpeg", "webp"] }
-windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_Graphics_Gdi"] }
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_Graphics_Gdi", "Win32_UI_Shell"] }
 
 [target.'cfg(not(target_os = "macos"))'.dependencies]
 tauri-plugin-single-instance = "2.5"
@@ -53,6 +54,7 @@ tauri-plugin-single-instance = "2.5"
 [dev-dependencies]
 tempfile = "3.27.0"
 
-# Mac App Store: wry without private macOS KVC calls (see vendor/README.md).
+# Mac App Store: wry and tao without private macOS API use (see vendor/README.md).
 [patch.crates-io]
 wry = { path = "../vendor/wry" }
+tao = { path = "../vendor/tao" }

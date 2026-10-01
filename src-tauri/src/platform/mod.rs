@@ -3,7 +3,7 @@
 //! macOS: the character is a native non-activating NSPanel with an
 //! NSImageView (public AppKit API only, so the app can ship on the Mac App
 //! Store); the memo is a Tauri webview window turned into a non-activating
-//! panel that can take keyboard focus without activating MemoPet.
+//! panel that can take keyboard focus without activating MemoBuddy.
 //! Windows: both are Tauri webview windows; the character never takes focus.
 
 #[cfg(target_os = "macos")]

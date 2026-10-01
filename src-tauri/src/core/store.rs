@@ -21,13 +21,13 @@ use super::model::{MemoNote, MemoNotebook, CURRENT_VERSION};
 
 #[derive(Debug, thiserror::Error)]
 pub enum StoreError {
-    #[error("These notes were created by a newer MemoPet data format (version {0}).")]
+    #[error("These notes were created by a newer MemoBuddy data format (version {0}).")]
     UnsupportedVersion(i64),
     #[error("{0}")]
     Io(#[from] std::io::Error),
     #[error("{0}")]
     Json(#[from] serde_json::Error),
-    #[error("No MemoPet notes were found in that folder.")]
+    #[error("No MemoBuddy notes were found in that folder.")]
     NothingToImport,
     #[error("The drawing contains an invalid point.")]
     InvalidDrawing,
@@ -306,7 +306,7 @@ impl MemoNotebookStore {
                         self.preserve_damaged_file(&self.notebook_path.clone(), "notes-corrupt")?;
                     self.save(&recovered)?;
                     self.recovery_notice = Some(format!(
-                        "The notes file was damaged, so MemoPet preserved it as {} and restored a recent backup.",
+                        "The notes file was damaged, so MemoBuddy preserved it as {} and restored a recent backup.",
                         file_name_of(&preserved)
                     ));
                     return Ok(recovered);
@@ -333,9 +333,9 @@ impl MemoNotebookStore {
         }
         let preserved_names = names.join(" and ");
         self.recovery_notice = Some(if preserved_backup_name.is_none() {
-            format!("The notes file was damaged. MemoPet started a blank notebook and preserved it as {preserved_names}.")
+            format!("The notes file was damaged. MemoBuddy started a blank notebook and preserved it as {preserved_names}.")
         } else {
-            format!("The notes files were damaged. MemoPet started a blank notebook and preserved them as {preserved_names}.")
+            format!("The notes files were damaged. MemoBuddy started a blank notebook and preserved them as {preserved_names}.")
         });
         Ok(blank)
     }

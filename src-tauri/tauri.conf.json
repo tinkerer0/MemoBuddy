@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "MemoPet",
+  "productName": "MemoBuddy",
   "version": "1.0.0",
   "identifier": "app.memopet.desktop",
   "build": {
@@ -24,7 +24,7 @@
     "category": "Productivity",
     "shortDescription": "A tiny notebook that floats above your apps",
     "longDescription": "Click the little character to open a memo. Type or draw, click elsewhere, and it saves and gets out of your way.",
-    "copyright": "© 2026 MemoPet",
+    "copyright": "© 2026 MemoBuddy contributors",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -35,6 +35,9 @@
     "macOS": {
       "minimumSystemVersion": "13.0",
       "entitlements": "./Entitlements.plist"
+    },
+    "resources": {
+      "../THIRD_PARTY_LICENSES.md": "THIRD_PARTY_LICENSES.md"
     }
   }
 }

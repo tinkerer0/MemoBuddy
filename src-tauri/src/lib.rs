@@ -1,6 +1,7 @@
 pub mod core;
 
 mod app;
+mod characters;
 mod i18n;
 mod platform;
 mod settings;
@@ -38,7 +39,7 @@ pub fn run() {
             app::character_look,
         ])
         .build(tauri::generate_context!())
-        .expect("error while building MemoPet")
+        .expect("error while building MemoBuddy")
         .run(|app, event| {
             // A quit that did not come from our own `app.exit` (Tauri sends
             // this when every window is gone): let the memo page save first.

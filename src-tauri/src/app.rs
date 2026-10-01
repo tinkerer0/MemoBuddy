@@ -20,6 +20,7 @@ use crate::core::placement::{self, Rect};
 use crate::core::store::MemoNotebookStore;
 use crate::i18n::tr;
 use crate::platform;
+use crate::characters;
 use crate::settings::{CharacterChoice, Settings, Theme, CHARACTER_SIZES, MAX_MEMO_SIZE, MIN_MEMO_SIZE};
 
 pub const BUBBLE_LABEL: &str = "bubble";
@@ -136,16 +137,16 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
             // Leave the files exactly as they are and explain, instead of crashing.
             let message = match &error {
                 crate::core::store::StoreError::UnsupportedVersion(_) => tr(
-                    "이 메모는 더 새 버전의 MemoPet에서 만들어졌습니다. MemoPet을 최신 버전으로 업데이트해 주세요. 파일은 바꾸지 않았습니다.",
-                    "These notes were created by a newer version of MemoPet. Please update MemoPet. The files were not changed.",
+                    "이 메모는 더 새 버전의 MemoBuddy에서 만들어졌습니다. MemoBuddy를 최신 버전으로 업데이트해 주세요. 파일은 바꾸지 않았습니다.",
+                    "These notes were created by a newer version of MemoBuddy. Please update MemoBuddy. The files were not changed.",
                 )
                 .to_owned(),
-                other => format!("{} {other}", tr("메모를 열 수 없습니다.", "MemoPet could not open your notes.")),
+                other => format!("{} {other}", tr("메모를 열 수 없습니다.", "MemoBuddy could not open your notes.")),
             };
             let handle = app.handle().clone();
             app.dialog()
                 .message(message)
-                .title("MemoPet")
+                .title("MemoBuddy")
                 .kind(MessageDialogKind::Error)
                 .show(move |_| handle.exit(1));
             return Ok(());
@@ -192,7 +193,7 @@ fn save_settings(app: &AppHandle) {
     let state = state(app);
     let settings = state.settings.lock().unwrap().clone();
     if let Err(error) = settings.save(&state.data_dir) {
-        eprintln!("MemoPet: could not save settings: {error}");
+        eprintln!("MemoBuddy: could not save settings: {error}");
     }
 }
 
@@ -206,7 +207,7 @@ fn save_error_message(error: &crate::core::store::StoreError) -> String {
     use crate::core::store::StoreError;
     let reason = match error {
         StoreError::Io(io) if io.kind() == std::io::ErrorKind::PermissionDenied => {
-            tr("저장 폴더에 쓸 수 있는 권한이 없습니다.", "MemoPet is not allowed to write to its data folder.").to_owned()
+            tr("저장 폴더에 쓸 수 있는 권한이 없습니다.", "MemoBuddy is not allowed to write to its data folder.").to_owned()
         }
         // StorageFull covers ENOSPC and Windows' ERROR_DISK_FULL / ERROR_HANDLE_DISK_FULL.
         StoreError::Io(io) if io.kind() == std::io::ErrorKind::StorageFull => tr("디스크 공간이 부족합니다.", "The disk is full.").to_owned(),
@@ -599,10 +600,15 @@ fn import_custom_character(app: &AppHandle, source: &Path) -> Result<(), String>
     let extension = image_extension(&bytes)
         .ok_or_else(|| tr("GIF, PNG, JPEG, WebP 이미지만 쓸 수 있습니다.", "Use a GIF, PNG, JPEG or WebP image.").to_owned())?;
     if !platform::image_is_decodable(&bytes) {
-        return Err(tr("이미지를 읽을 수 없습니다.", "That image could not be read.").to_owned());
+        return Err(tr(
+            "이 이미지는 쓸 수 없습니다. 읽을 수 없거나 너무 큽니다(한 장 1,600만 픽셀, 움직이는 그림은 240장·전체 2,400만 픽셀까지).",
+            "That image can't be used: it could not be read, or it is too large (up to 16 megapixels, or 240 frames and 24 megapixels in all for an animation).",
+        )
+        .to_owned());
     }
     let state = state(app);
     let name = format!("custom-character.{extension}");
+    debug_assert!(crate::settings::CUSTOM_CHARACTER_FILES.contains(&name.as_str()));
     let target = state.data_dir.join(&name);
     let temporary = state.data_dir.join(format!(".{name}.tmp"));
     std::fs::write(&temporary, &bytes).map_err(|error| error.to_string())?;
@@ -635,6 +641,12 @@ pub fn image_extension(bytes: &[u8]) -> Option<&'static str> {
 
 // ---------- menus ----------
 
+/// Opened from the menus in the default browser (App Store guideline 5.1.1
+/// wants the privacy policy reachable inside the app).
+pub const PRIVACY_POLICY_URL: &str = "https://github.com/tinkerer0/MemoBuddy/blob/main/docs/PRIVACY.md";
+/// The same notices ship inside the app as THIRD_PARTY_LICENSES.md.
+pub const LICENSES_URL: &str = "https://github.com/tinkerer0/MemoBuddy/blob/main/THIRD_PARTY_LICENSES.md";
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MenuAction {
     OpenMemo,
@@ -642,6 +654,8 @@ pub enum MenuAction {
     CustomCharacter,
     Size(usize),
     Theme(Theme),
+    PrivacyPolicy,
+    Licenses,
     Quit,
 }
 
@@ -649,10 +663,12 @@ impl MenuAction {
     pub fn id(self) -> String {
         match self {
             MenuAction::OpenMemo => "open".into(),
-            MenuAction::Character(choice) => format!("character-{choice:?}"),
+            MenuAction::Character(choice) => format!("character-{}", choice.id()),
             MenuAction::CustomCharacter => "character-custom-pick".into(),
             MenuAction::Size(index) => format!("size-{index}"),
             MenuAction::Theme(theme) => format!("theme-{theme:?}"),
+            MenuAction::PrivacyPolicy => "privacy".into(),
+            MenuAction::Licenses => "licenses".into(),
             MenuAction::Quit => "quit".into(),
         }
     }
@@ -663,11 +679,13 @@ impl MenuAction {
             MenuAction::CustomCharacter,
             MenuAction::Theme(Theme::Light),
             MenuAction::Theme(Theme::Dark),
+            MenuAction::PrivacyPolicy,
+            MenuAction::Licenses,
             MenuAction::Quit,
         ];
-        for choice in [CharacterChoice::Classic, CharacterChoice::MemoWriter, CharacterChoice::OrbitingPlanet, CharacterChoice::Custom] {
-            all.push(MenuAction::Character(choice));
-        }
+        all.push(MenuAction::Character(CharacterChoice::Classic));
+        all.extend(characters::BUILT_IN.iter().map(|builtin| MenuAction::Character(CharacterChoice::Builtin(builtin))));
+        all.push(MenuAction::Character(CharacterChoice::Custom));
         for index in 0..CHARACTER_SIZES.len() {
             all.push(MenuAction::Size(index));
         }
@@ -696,11 +714,11 @@ fn check(action: MenuAction, title: &str, checked: bool) -> MenuEntry {
 pub fn menu_model(app: &AppHandle, include_open: bool) -> Vec<MenuEntry> {
     let settings = state(app).settings.lock().unwrap().clone();
     let choice = settings.character_choice;
-    let mut characters = vec![
-        check(MenuAction::Character(CharacterChoice::Classic), "Classic", choice == CharacterChoice::Classic),
-        check(MenuAction::Character(CharacterChoice::MemoWriter), "Memo Writer", choice == CharacterChoice::MemoWriter),
-        check(MenuAction::Character(CharacterChoice::OrbitingPlanet), "Orbiting Planet", choice == CharacterChoice::OrbitingPlanet),
-    ];
+    let mut characters = vec![check(MenuAction::Character(CharacterChoice::Classic), "Classic", choice == CharacterChoice::Classic)];
+    for builtin in characters::BUILT_IN {
+        let builtin_choice = CharacterChoice::Builtin(builtin);
+        characters.push(check(MenuAction::Character(builtin_choice), builtin.name, choice == builtin_choice));
+    }
     if settings.custom_character_file.is_some() {
         characters.push(check(MenuAction::Character(CharacterChoice::Custom), tr("내 이미지", "My Image"), choice == CharacterChoice::Custom));
     }
@@ -727,7 +745,10 @@ pub fn menu_model(app: &AppHandle, include_open: bool) -> Vec<MenuEntry> {
     model.push(MenuEntry::Submenu { title: tr("크기", "Size").to_owned(), items: sizes });
     model.push(MenuEntry::Submenu { title: tr("테마", "Theme").to_owned(), items: themes });
     model.push(MenuEntry::Separator);
-    model.push(item(MenuAction::Quit, tr("MemoPet 종료", "Quit MemoPet")));
+    model.push(item(MenuAction::PrivacyPolicy, tr("개인정보 처리방침", "Privacy Policy")));
+    model.push(item(MenuAction::Licenses, tr("오픈소스 라이선스", "Open-Source Licenses")));
+    model.push(MenuEntry::Separator);
+    model.push(item(MenuAction::Quit, tr("MemoBuddy 종료", "Quit MemoBuddy")));
     model
 }
 
@@ -762,7 +783,18 @@ pub fn handle_menu_action(app: &AppHandle, action: MenuAction) {
             apply_theme(app);
             rebuild_tray_menu(app);
         }
+        MenuAction::PrivacyPolicy => open_link(app, PRIVACY_POLICY_URL),
+        MenuAction::Licenses => open_link(app, LICENSES_URL),
         MenuAction::Quit => request_quit(app),
+    }
+}
+
+/// Opens a page in the default browser; if that fails, shows the address so
+/// it can still be read (no browser, or opening was refused).
+fn open_link(app: &AppHandle, url: &str) {
+    if !platform::open_url(app, url) {
+        let message = format!("{}\n{url}", tr("브라우저를 열 수 없습니다. 이 주소를 브라우저에 붙여 넣어 주세요.", "The browser could not be opened. Paste this address into a browser:"));
+        show_message(app, tr("페이지를 열 수 없습니다", "Could not open the page"), &message, false);
     }
 }
 
@@ -840,7 +872,7 @@ fn install_tray(app: &AppHandle) -> tauri::Result<()> {
     let tray = TrayIconBuilder::with_id("memopet-tray")
         .icon(icon)
         .icon_as_template(true)
-        .tooltip("MemoPet")
+        .tooltip("MemoBuddy")
         .menu(&tauri_menu(app, true)?)
         .show_menu_on_left_click(true)
         .on_menu_event(|app, event| {
@@ -859,8 +891,8 @@ fn install_tray(app: &AppHandle) -> tauri::Result<()> {
 /// they give the memo its text shortcuts (⌘C, ⌘V, ⌘A, text undo).
 #[cfg(target_os = "macos")]
 fn install_app_menu(app: &AppHandle) -> tauri::Result<()> {
-    let quit = MenuItem::with_id(app, MenuAction::Quit.id(), tr("MemoPet 종료", "Quit MemoPet"), true, Some("CmdOrCtrl+Q"))?;
-    let app_menu = Submenu::with_items(app, "MemoPet", true, &[&quit])?;
+    let quit = MenuItem::with_id(app, MenuAction::Quit.id(), tr("MemoBuddy 종료", "Quit MemoBuddy"), true, Some("CmdOrCtrl+Q"))?;
+    let app_menu = Submenu::with_items(app, "MemoBuddy", true, &[&quit])?;
     let edit = Submenu::with_items(
         app,
         tr("편집", "Edit"),

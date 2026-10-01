@@ -35,6 +35,7 @@ src-tauri/embedded.provisionprofile
 src-tauri/tauri.appstore.conf.json
 dist-mas/
 packaging/windows/stage/
+packaging/windows/out/
 packaging/windows/Package.appxmanifest
 packaging/windows/devcert.*
 *.msix
