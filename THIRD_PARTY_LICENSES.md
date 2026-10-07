@@ -3,8 +3,9 @@
 MemoBuddy includes the open-source software listed below, each used under the
 license shown. The texts are the license files published with each component.
 None of them is modified except wry and tao, whose sources (with MemoBuddy's
-small changes, marked "MemoPet patch") are in the MemoBuddy repository under
-vendor/. The source code of every Rust crate, including those under the
+small changes, marked "MemoPet patch") are in the MemoBuddy repository's
+history under vendor/ (commit 2919e82,
+https://github.com/tinkerer0/MemoBuddy/tree/2919e82/vendor). The source code of every Rust crate, including those under the
 Mozilla Public License 2.0, is available from crates.io
 (https://crates.io/crates/<name>).
 
