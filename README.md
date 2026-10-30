@@ -4,15 +4,15 @@
 
 펫을 누르면 메모가 열리고, 다른 곳을 누르면 저장 후 닫힙니다. 메모 앱을 따로 찾아 열거나 저장 버튼을 누를 필요 없이, 떠오른 생각을 글과 그림으로 남길 수 있습니다.
 
-[Windows 다운로드](https://apps.microsoft.com/detail/9mv1clqjv6cx) · [사용법](#사용법) · [문의·의견](https://github.com/tinkerer0/MemoBuddy/issues) · [English](#english)
+[Mac App Store](https://apps.apple.com/app/id6818223612) · [Microsoft Store](https://apps.microsoft.com/detail/9mv1clqjv6cx) · [사용법](#사용법) · [문의·의견](https://github.com/tinkerer0/MemoBuddy/issues) · [English](#english)
 
 ![MemoBuddy의 펫과 글·그림 메모 화면](assets/memobuddy-windows.jpg)
 
-<sub>Microsoft Store에 공개한 Windows 앱 화면.</sub>
+<sub>Windows 앱 화면. macOS 앱도 같은 기능입니다.</sub>
 
 ## 사용법
 
-1. [Microsoft Store](https://apps.microsoft.com/detail/9mv1clqjv6cx)에서 Windows 앱을 설치합니다.
+1. macOS는 [Mac App Store](https://apps.apple.com/app/id6818223612), Windows는 [Microsoft Store](https://apps.microsoft.com/detail/9mv1clqjv6cx)에서 설치합니다. 둘 다 무료입니다.
 2. 화면의 펫을 눌러 메모를 열고, 글을 쓰거나 그림을 그립니다.
 3. 다른 곳을 누르면 메모가 저장되고 닫힙니다. 다시 펫을 누르면 이어서 쓸 수 있습니다.
 
@@ -26,7 +26,7 @@
 | 화면 설정 | 펫 크기 3단계, 화이트·다크 테마 |
 | 로컬 저장 | 계정 없이 사용하고 메모를 내 컴퓨터에 보관 |
 
-펫을 우클릭하거나 알림 영역에서 모양과 설정을 바꿀 수 있습니다. 기능과 배포 안내는 [Microsoft Store 페이지](https://apps.microsoft.com/detail/9mv1clqjv6cx)에서도 확인할 수 있습니다.
+펫을 우클릭하거나 알림 영역에서 모양과 설정을 바꿀 수 있습니다. 기능과 배포 안내는 [Mac App Store](https://apps.apple.com/app/id6818223612)와 [Microsoft Store](https://apps.microsoft.com/detail/9mv1clqjv6cx) 페이지에서도 확인할 수 있습니다.
 
 ## 지원과 개인정보
 
@@ -45,6 +45,6 @@
 
 MemoBuddy is a small desktop pet that keeps your notes close. Click the pet to write or draw; click elsewhere to save and close. Use tabs for multiple notes, choose one of nine characters or your own image/GIF, and switch between light and dark themes.
 
-[Download for Windows](https://apps.microsoft.com/detail/9mv1clqjv6cx) · [Support](https://github.com/tinkerer0/MemoBuddy/issues) · [Privacy](docs/PRIVACY.md) · [Security](SECURITY.md) · [Third-party licenses](THIRD_PARTY_LICENSES.md)
+[Mac App Store](https://apps.apple.com/app/id6818223612) · [Microsoft Store](https://apps.microsoft.com/detail/9mv1clqjv6cx) · [Support](https://github.com/tinkerer0/MemoBuddy/issues) · [Privacy](docs/PRIVACY.md) · [Security](SECURITY.md) · [Third-party licenses](THIRD_PARTY_LICENSES.md)
 
 This repository contains product and support documentation. Current app source code is private. Earlier versions in the repository history, including the original Swift/AppKit MemoPet, remain available under the [MIT License](LICENSE).
