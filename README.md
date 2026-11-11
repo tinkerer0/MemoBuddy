@@ -1,50 +1,44 @@
 # MemoBuddy
 
-**작업하던 화면에서 바로 쓰고 그리는 작은 펫 메모장.**
+English · [한국어](README.ko.md)
 
-펫을 누르면 메모가 열리고, 다른 곳을 누르면 저장 후 닫힙니다. 메모 앱을 따로 찾아 열거나 저장 버튼을 누를 필요 없이, 떠오른 생각을 글과 그림으로 남길 수 있습니다.
+**A small pet notepad for writing and drawing right where you are working.**
 
-[Mac App Store](https://apps.apple.com/app/id6818223612) · [Microsoft Store](https://apps.microsoft.com/detail/9mv1clqjv6cx) · [사용법](#사용법) · [문의·의견](https://github.com/tinkerer0/MemoBuddy/issues) · [English](#english)
+Click the pet to open a note; click anywhere else to save and close it. You do not have to find a notes app or press a save button to capture a passing thought as text or a drawing.
 
-![MemoBuddy의 펫과 글·그림 메모 화면](assets/memobuddy-windows.jpg)
+[Mac App Store](https://apps.apple.com/app/id6818223612) · [Microsoft Store](https://apps.microsoft.com/detail/9mv1clqjv6cx) · [How to use](#how-to-use) · [Questions and feedback](https://github.com/tinkerer0/MemoBuddy/issues)
 
-<sub>Windows 앱 화면. macOS 앱도 같은 기능입니다.</sub>
+![MemoBuddy's pet and a note with text and a drawing](assets/memobuddy-windows.jpg)
 
-## 사용법
+<sub>Screenshot of the Windows app. The macOS app has the same features.</sub>
 
-1. macOS는 [Mac App Store](https://apps.apple.com/app/id6818223612), Windows는 [Microsoft Store](https://apps.microsoft.com/detail/9mv1clqjv6cx)에서 설치합니다. 둘 다 무료입니다.
-2. 화면의 펫을 눌러 메모를 열고, 글을 쓰거나 그림을 그립니다.
-3. 다른 곳을 누르면 메모가 저장되고 닫힙니다. 다시 펫을 누르면 이어서 쓸 수 있습니다.
+## How to use
 
-## 주요 기능
+1. Install from the [Mac App Store](https://apps.apple.com/app/id6818223612) on macOS or the [Microsoft Store](https://apps.microsoft.com/detail/9mv1clqjv6cx) on Windows. Both are free.
+2. Click the pet on your screen to open a note, then write or draw.
+3. Click anywhere else and the note is saved and closed. Click the pet again to pick up where you left off.
 
-| 기능 | 할 수 있는 일 |
+## Features
+
+| Feature | What you can do |
 | --- | --- |
-| 글과 그림 | 한 메모 안에서 글을 쓰고 펜·지우개로 그리기 |
-| 여러 메모 | 탭 추가·이름 변경·순서 변경·삭제 |
-| 나만의 펫 | 기본 캐릭터 9종 또는 직접 고른 사진·GIF 사용 |
-| 화면 설정 | 펫 크기 3단계, 화이트·다크 테마 |
-| 로컬 저장 | 계정 없이 사용하고 메모를 내 컴퓨터에 보관 |
+| Text and drawing | Write and draw with a pen and eraser in the same note |
+| Multiple notes | Add, rename, reorder and delete tabs |
+| Your own pet | Use one of 9 built-in characters or a photo or GIF you choose |
+| Display settings | Three pet sizes, light and dark themes |
+| Local storage | No account needed; notes are kept on your own computer |
 
-펫을 우클릭하거나 알림 영역에서 모양과 설정을 바꿀 수 있습니다. 기능과 배포 안내는 [Mac App Store](https://apps.apple.com/app/id6818223612)와 [Microsoft Store](https://apps.microsoft.com/detail/9mv1clqjv6cx) 페이지에서도 확인할 수 있습니다.
+Right-click the pet, or use the notification area, to change its look and settings. You can also find feature and distribution details on the [Mac App Store](https://apps.apple.com/app/id6818223612) and [Microsoft Store](https://apps.microsoft.com/detail/9mv1clqjv6cx) pages.
 
-## 지원과 개인정보
+## Support and privacy
 
-- **문의·오류·제안**: [Issues](https://github.com/tinkerer0/MemoBuddy/issues). 앱 버전, 운영체제, 재현 방법을 함께 적어 주세요.
-- **개인정보**: [개인정보 처리방침](docs/PRIVACY.md). MemoBuddy에는 계정·광고·추적 기능이 없으며 메모는 컴퓨터에 저장됩니다. Windows WebView2 진단 정보 등 상세 범위도 이 문서에서 안내합니다.
-- **보안 문제**: [보안 신고 안내](SECURITY.md)의 비공개 신고 경로를 이용해 주세요.
-- **사용한 구성 요소**: [오픈소스 라이선스](THIRD_PARTY_LICENSES.md).
+- **Questions, bugs, suggestions**: [Issues](https://github.com/tinkerer0/MemoBuddy/issues). Please include the app version, your operating system and steps to reproduce.
+- **Privacy**: [Privacy policy](docs/PRIVACY.md). MemoBuddy has no accounts, ads or tracking, and notes are stored on your computer. The document also covers details such as Windows WebView2 diagnostic data.
+- **Security issues**: Please use the private reporting channel described in the [security reporting guide](SECURITY.md).
+- **Components used**: [Open-source licenses](THIRD_PARTY_LICENSES.md).
 
-## 이 저장소에 있는 것
+## What is in this repository
 
-앱 소개, 지원 창구, 개인정보 처리방침과 라이선스 문서를 관리합니다. 현재 앱의 소스 코드는 비공개입니다.
+It holds the app introduction, the support channel, the privacy policy and license documents. The current app's source code is private.
 
-이전 이름은 **MemoPet**입니다. 이 저장소 이력에 남아 있는 이전 버전(초기의 Swift/AppKit MemoPet 포함)은 기존 [MIT 라이선스](LICENSE)로 제공됩니다.
-
-## English
-
-MemoBuddy is a small desktop pet that keeps your notes close. Click the pet to write or draw; click elsewhere to save and close. Use tabs for multiple notes, choose one of nine characters or your own image/GIF, and switch between light and dark themes.
-
-[Mac App Store](https://apps.apple.com/app/id6818223612) · [Microsoft Store](https://apps.microsoft.com/detail/9mv1clqjv6cx) · [Support](https://github.com/tinkerer0/MemoBuddy/issues) · [Privacy](docs/PRIVACY.md) · [Security](SECURITY.md) · [Third-party licenses](THIRD_PARTY_LICENSES.md)
-
-This repository contains product and support documentation. Current app source code is private. Earlier versions in the repository history, including the original Swift/AppKit MemoPet, remain available under the [MIT License](LICENSE).
+The previous name was **MemoPet**. Earlier versions that remain in this repository's history, including the original Swift/AppKit MemoPet, are provided under the existing [MIT License](LICENSE).
